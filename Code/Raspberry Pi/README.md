@@ -12,6 +12,9 @@ This library lets you run machine learning models and collect sensor data on Lin
     ```
     $ sudo apt-get install libatlas-base-dev libportaudio0 libportaudio2 libportaudiocpp0 portaudio19-dev libopenjp2-7 libgtk-3-0 libswscale-dev libavformat58 libavcodec58
     $ pip3 install edge_impulse_linux -i https://pypi.python.org/simple
+    $ pip3 install -r requirements.txt
+    $ python3 setup.py install
+    $ python3 setup.py build
     ```
 
     **Other platforms**
