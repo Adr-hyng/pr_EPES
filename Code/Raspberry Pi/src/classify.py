@@ -13,6 +13,9 @@ import psutil
 
 runner = None
 is_speaking = False
+detection_timestamps = []  # List to store timestamps of detections
+min_detections = 10  # Minimum number of detections required within 2 seconds
+frequency_millis = 2000 # Number of milliseconds to detect it is consistent container.
 
 # if you don't want to see a camera preview, set this to False
 show_camera = True
@@ -49,6 +52,24 @@ def run_tts(text):
             print("TTS process is already running.")
     except Exception as e:
         print(f"Failed to run TTS: {e}")
+
+def remove_old_detections(current_time):
+    """Remove detections older than 2 seconds."""
+    global detection_timestamps
+    two_seconds_ago = current_time - frequency_millis  # Convert 2 seconds to milliseconds
+    detection_timestamps = [timestamp for timestamp in detection_timestamps if timestamp >= two_seconds_ago]
+
+def check_for_consistent_detections(executor):
+    """Check if there are enough recent detections to trigger an action."""
+    global detection_timestamps
+    if len(detection_timestamps) >= min_detections:
+        print("Consistent container detections detected!")
+        # Execute your action here
+        
+        # IF VL53L0X get its default max range, then there's no object, so stop dispensing.
+        
+        executor.submit(run_tts, "A container is detected. Please stand still.")
+        detection_timestamps.clear()  # Reset detections to avoid repeated actions
 
 def now():
     return round(time.time() * 1000)
@@ -114,6 +135,9 @@ def main():
                 for res, img in runner.classifier(videoCaptureDeviceId):
                     if (next_frame > now()):
                         time.sleep((next_frame - now()) / 1000)
+                        
+                    current_time = now()  # Get current time in milliseconds
+                    remove_old_detections(current_time)  # Remove old detections
 
                     # print('classification runner response', res)
 
@@ -129,9 +153,10 @@ def main():
                         for bb in res["result"]["bounding_boxes"]:
                             if bb['value'] < 0.9: continue
                             print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
-                            executor.submit(run_tts, "A container is detected. Please stand still.")
+                            detection_timestamps.append(current_time)  # Record detection time
                             img = cv2.rectangle(img, (bb['x'], bb['y']), (bb['x'] + bb['width'], bb['y'] + bb['height']), (255, 0, 0), 1)
-
+                    
+                    check_for_consistent_detections(executor)  # Check for consistent detections
                     if (show_camera):
                         cv2.imshow('Drinking Container Presence Detection', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
                         if cv2.waitKey(1) == ord('q'):
