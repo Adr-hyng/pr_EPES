@@ -14,7 +14,7 @@ import psutil
 
 runner = None
 is_speaking = False
-tts_lock = threading.Lock()
+# ~ tts_lock = threading.Lock()
 
 # if you don't want to see a camera preview, set this to False
 show_camera = True
@@ -37,26 +37,25 @@ def is_process_running(process_name):
 def run_tts(text):
     import subprocess
     global is_speaking
-    global tts_lock
-    with tts_lock:
-        try:
-            process_name = "ttsDemo"
-            if not is_process_running(process_name):
-                if(not is_speaking):
-                    print(f"Running TTS: {text}")
-                    is_speaking = True
-                    process = subprocess.Popen(['./ttsDemo'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                    stdout, stderr = process.communicate(input=text)
-                    print(f"TTS Output: {stdout}")
-                    is_speaking = False
-                    if process.returncode != 0:
-                        print(f"Error: {stderr}")
-            else:
-                print("TTS process is already running.")
-        except Exception as e:
-            print(f"Failed to run TTS: {e}")
-        # ~ finally:
-            # ~ is_speaking = False
+    # ~ global tts_lock
+    # ~ with tts_lock:
+    try:
+        process_name = "ttsDemo"
+        print(f'{is_process_running(process_name)} is running? ')
+        if not is_process_running(process_name):
+            if(not is_speaking):
+                print(f"Running TTS: {text}")
+                is_speaking = True
+                process = subprocess.Popen(['./ttsDemo'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                stdout, stderr = process.communicate(input=text)
+                print(f"TTS Output: {stdout}")
+                is_speaking = False
+                if process.returncode != 0:
+                    print(f"Error: {stderr}")
+        else:
+            print("TTS process is already running.")
+    except Exception as e:
+        print(f"Failed to run TTS: {e}")
 
 def now():
     return round(time.time() * 1000)
