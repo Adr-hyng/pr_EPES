@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+# build the setup through: "python setup.py build"
+# install the setup through: "sudo python setup.py install"
+# before installing all the dependencies follow the edge impulse sdk guide, and install pyAudio through apt-get.
+# install all the dependencies: "sudo pip install -r requirements.txt --break-system-packages"
+# use command to permit access to eim file: "chmod +x <modelfile.eim path>"
+# run this python script.
+
 import device_patches       # Device specific patches for Jetson Nano (needs to be before importing cv2)
 
 import cv2
@@ -42,26 +49,8 @@ def sigint_handler(sig, frame):
 
 signal.signal(signal.SIGINT, sigint_handler)
 
-def help():
-    print('python classify.py <path_to_model.eim> <Camera port ID, only required when more than 1 camera is present>')
-
 def main(argv):
-    try:
-        opts, args = getopt.getopt(argv, "h", ["--help"])
-    except getopt.GetoptError:
-        help()
-        sys.exit(2)
-
-    for opt, arg in opts:
-        if opt in ('-h', '--help'):
-            help()
-            sys.exit()
-
-    if len(args) == 0:
-        help()
-        sys.exit(2)
-
-    model = args[0]
+    model = "modelfile.eim"
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     modelfile = os.path.join(dir_path, model)
@@ -73,15 +62,12 @@ def main(argv):
             model_info = runner.init()
             print('Loaded runner for "' + model_info['project']['owner'] + ' / ' + model_info['project']['name'] + '"')
             labels = model_info['model_parameters']['labels']
-            if len(args)>= 2:
-                videoCaptureDeviceId = int(args[1])
-            else:
-                port_ids = get_webcams()
-                if len(port_ids) == 0:
-                    raise Exception('Cannot find any webcams')
-                if len(args)<= 1 and len(port_ids)> 1:
-                    raise Exception("Multiple cameras found. Add the camera port ID as a second argument to use to this script")
-                videoCaptureDeviceId = int(port_ids[0])
+            port_ids = get_webcams()
+            if len(port_ids) == 0:
+                raise Exception('Cannot find any webcams')
+            if len(port_ids)> 1:
+                raise Exception("Multiple cameras found. Add the camera port ID as a second argument to use to this script")
+            videoCaptureDeviceId = int(port_ids[0])
 
             camera = cv2.VideoCapture(videoCaptureDeviceId)
             ret = camera.read()[0]
@@ -120,7 +106,8 @@ def main(argv):
                     if cv2.waitKey(1) == ord('q'):
                         break
 
-                next_frame = now() + 100
+                #next_frame = now() + 100
+                next_frame = now() + 10
         finally:
             if (runner):
                 runner.stop()
