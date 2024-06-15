@@ -68,6 +68,8 @@ def check_for_consistent_detections(executor):
         
         # IF VL53L0X get its default max range, then there's no object, so stop dispensing.
         
+        # EXECUTE only this TTS when initially detected the container, then resets
+        # after there's no object detected from ToF Sensor.
         executor.submit(run_tts, "A container is detected. Please stand still.")
         detection_timestamps.clear()  # Reset detections to avoid repeated actions
 
