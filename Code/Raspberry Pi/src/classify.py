@@ -8,13 +8,11 @@ import sys
 import signal
 import time
 import concurrent.futures
-import threading
 from edge_impulse_linux.image import ImageImpulseRunner
 import psutil
 
 runner = None
 is_speaking = False
-# ~ tts_lock = threading.Lock()
 
 # if you don't want to see a camera preview, set this to False
 show_camera = True
@@ -37,21 +35,16 @@ def is_process_running(process_name):
 def run_tts(text):
     import subprocess
     global is_speaking
-    # ~ global tts_lock
-    # ~ with tts_lock:
     try:
         process_name = "ttsDemo"
-        print(f'{is_process_running(process_name)} is running? ')
         if not is_process_running(process_name):
             if(not is_speaking):
-                print(f"Running TTS: {text}")
                 is_speaking = True
                 process = subprocess.Popen(['./ttsDemo'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 stdout, stderr = process.communicate(input=text)
-                print(f"TTS Output: {stdout}")
+                # After process completed.
                 is_speaking = False
-                if process.returncode != 0:
-                    print(f"Error: {stderr}")
+                if process.returncode != 0: print(f"Error: {stderr}")
         else:
             print("TTS process is already running.")
     except Exception as e:
@@ -134,6 +127,7 @@ def main():
                     elif "bounding_boxes" in res["result"].keys():
                         print('Found %d bounding boxes (%d ms.)' % (len(res["result"]["bounding_boxes"]), res['timing']['dsp'] + res['timing']['classification']))
                         for bb in res["result"]["bounding_boxes"]:
+                            if bb['value'] < 0.9: continue
                             print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
                             executor.submit(run_tts, "A container is detected. Please stand still.")
                             img = cv2.rectangle(img, (bb['x'], bb['y']), (bb['x'] + bb['width'], bb['y'] + bb['height']), (255, 0, 0), 1)
@@ -143,7 +137,7 @@ def main():
                         if cv2.waitKey(1) == ord('q'):
                             break
 
-                    #next_frame = now() + 100
+                    # ~ next_frame = now() + 100
                     next_frame = now() + 10
         finally:
             if runner:
