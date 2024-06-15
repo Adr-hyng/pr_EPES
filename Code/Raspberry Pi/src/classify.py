@@ -1,12 +1,5 @@
 #!/usr/bin/env python
 
-# build the setup through: "python setup.py build"
-# install the setup through: "sudo python setup.py install"
-# before installing all the dependencies follow the edge impulse sdk guide, and install pyAudio through apt-get.
-# install all the dependencies: "sudo pip install -r requirements.txt --break-system-packages"
-# use command to permit access to eim file: "chmod +x <modelfile.eim path>"
-# run this python script.
-
 import device_patches       # Device specific patches for Jetson Nano (needs to be before importing cv2)
 
 import cv2
@@ -15,11 +8,13 @@ import sys
 import signal
 import time
 import concurrent.futures
+import threading
 from edge_impulse_linux.image import ImageImpulseRunner
 import psutil
 
 runner = None
 is_speaking = False
+tts_lock = threading.Lock()
 
 # if you don't want to see a camera preview, set this to False
 show_camera = True
@@ -41,21 +36,27 @@ def is_process_running(process_name):
 
 def run_tts(text):
     import subprocess
-    try:
-        process_name = "ttsDemo"
-        if not is_process_running(process_name):
-            print(f"Running TTS: {text}")
-            process = subprocess.run(['./ttsDemo'], input=text, text=True, capture_output=True)
-            myProcessIsRunning = poll() is None 
-            if(not myProcessIsRunning):
-                print("Terminate TTS");
-            print(f"TTS Output: {process.stdout}")
-            if process.returncode != 0: print(f"Error: {process.stderr}")            
-        else:
-            print("TTS process is already running.")
-            return
-    except Exception as e:
-        print(f"Failed to run TTS: {e}")
+    global is_speaking
+    global tts_lock
+    with tts_lock:
+        try:
+            process_name = "ttsDemo"
+            if not is_process_running(process_name):
+                if(not is_speaking):
+                    print(f"Running TTS: {text}")
+                    is_speaking = True
+                    process = subprocess.Popen(['./ttsDemo'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    stdout, stderr = process.communicate(input=text)
+                    print(f"TTS Output: {stdout}")
+                    is_speaking = False
+                    if process.returncode != 0:
+                        print(f"Error: {stderr}")
+            else:
+                print("TTS process is already running.")
+        except Exception as e:
+            print(f"Failed to run TTS: {e}")
+        # ~ finally:
+            # ~ is_speaking = False
 
 def now():
     return round(time.time() * 1000)
