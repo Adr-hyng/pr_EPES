@@ -11,10 +11,21 @@ import concurrent.futures
 from edge_impulse_linux.image import ImageImpulseRunner
 import psutil
 
+import board
+import busio
+import adafruit_vl53l0x
+
+
+# ToF Sensor
+i2c = busio.I2C(board.SCL, board.SDA)
+vl53L0X = adafruit_vl53l0x.VL53L0X(i2c)
+vl53L0X.measurement_timing_budget = 200000 # Slow, Accurate
+
+
 runner = None
 is_speaking = False
 detection_timestamps = []  # List to store timestamps of detections
-min_detections = 10  # Minimum number of detections required within 2 seconds
+min_detections = 3  # Minimum number of detections required within 2 seconds
 frequency_millis = 2000 # Number of milliseconds to detect it is consistent container.
 
 # if you don't want to see a camera preview, set this to False
@@ -70,7 +81,7 @@ def check_for_consistent_detections(executor):
         
         # EXECUTE only this TTS when initially detected the container, then resets
         # after there's no object detected from ToF Sensor.
-        executor.submit(run_tts, "A container is detected. Please stand still.")
+        # ~ executor.submit(run_tts, "A container is detected. Please stand still.")
         detection_timestamps.clear()  # Reset detections to avoid repeated actions
 
 def now():
@@ -151,10 +162,11 @@ def main():
                         print('', flush=True)
 
                     elif "bounding_boxes" in res["result"].keys():
-                        print('Found %d bounding boxes (%d ms.)' % (len(res["result"]["bounding_boxes"]), res['timing']['dsp'] + res['timing']['classification']))
+                        # ~ print('Found %d bounding boxes (%d ms.)' % (len(res["result"]["bounding_boxes"]), res['timing']['dsp'] + res['timing']['classification']))
                         for bb in res["result"]["bounding_boxes"]:
-                            if bb['value'] < 0.9: continue
-                            print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
+                            if bb['value'] < 0.90: continue
+                            # ~ print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
+                            print("Range: {0}mm".format(vl53L0X.range))
                             detection_timestamps.append(current_time)  # Record detection time
                             img = cv2.rectangle(img, (bb['x'], bb['y']), (bb['x'] + bb['width'], bb['y'] + bb['height']), (255, 0, 0), 1)
                     
