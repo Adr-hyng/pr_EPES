@@ -3,7 +3,7 @@
 long sample=0;
 float val=0;
 long count=0;
-double knownWeight = 569.4; // in grams
+double knownWeight = 5989; // in grams
 unsigned long readCount(void)
 {
   unsigned long Count;
@@ -74,7 +74,7 @@ void calibrate()
     count=sample-count;
   }
 
-  // val = -110.82;
+  // val = -110.82; // Remove this, and assign it to the value being produced by calibration.
 
   Serial.println("\nPlease Wait....\n\n");
   delay(2000);
