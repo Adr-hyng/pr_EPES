@@ -2,6 +2,7 @@
 
 import device_patches       # Device specific patches for Jetson Nano (needs to be before importing cv2)
 
+import math
 import cv2
 import os
 import sys
@@ -22,13 +23,14 @@ GPIO.setmode(GPIO.BCM)
 DispenseSwitch = 27
 AutoSwitch = 22
 RelayPump = 17
+RelayState = GPIO.LOW
 GPIO.setup(DispenseSwitch,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(AutoSwitch,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(RelayPump,GPIO.OUT)
 
 # ToF Sensor
-i2c = busio.I2C(board.SCL, board.SDA)
-vl53L0X = adafruit_vl53l0x.VL53L0X(i2c)
+# ~ i2c = busio.I2C(board.SCL, board.SDA)
+# ~ vl53L0X = adafruit_vl53l0x.VL53L0X(i2c)
 # ~ vl53L0X.measurement_timing_budget = 200000 # Slow, Accurate
 
 
@@ -93,13 +95,10 @@ def check_for_consistent_detections(executor):
         # EXECUTE only this TTS when initially detected the container, then resets
         # after there's no object detected from ToF Sensor.
         if dispense_state == 1:
-            GPIO.output(RelayPump,GPIO.HIGH)
+            RelayState = GPIO.HIGH
             # ~ executor.submit(run_tts, "A container is detected. Please stand still.")
-            # ~ print("TURN ON")
         else:
-            GPIO.output(RelayPump,GPIO.LOW)
-            # ~ print("TURN OFF")
-            
+            RelayState = GPIO.LOW
         detection_timestamps.clear()  # Reset detections to avoid repeated actions
 
 def now():
@@ -136,6 +135,8 @@ def main():
     modelfile = os.path.join(dir_path, model)
 
     print('MODEL:', modelfile)
+    
+    RelayState = GPIO.LOW
 
     with ImageImpulseRunner(modelfile) as runner:
         try:
@@ -165,22 +166,19 @@ def main():
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for res, img in runner.classifier(videoCaptureDeviceId):
                     # Dispense Button
-                    # ~ print("Range: {0}mm".format(vl53L0X.range))
                     dispense_state = GPIO.input(DispenseSwitch)
                     automatic_state = GPIO.input(AutoSwitch)
                     
                     if automatic_state == 0:
-                        if not dispense_state: GPIO.output(RelayPump,GPIO.LOW)
-                        else: GPIO.output(RelayPump,GPIO.HIGH)
+                        if not dispense_state: RelayState = GPIO.LOW
+                        else: RelayState = GPIO.HIGH
                     else:
-                        if vl53L0X.range < 100:
-                            GPIO.output(RelayPump,GPIO.LOW)
                         if (next_frame > now()):
                             time.sleep((next_frame - now()) / 1000)
                             
                         current_time = now()  # Get current time in milliseconds
                         remove_old_detections(current_time)  # Remove old detections
-
+                                 
                         # print('classification runner response', res)
 
                         if "classification" in res["result"].keys():
@@ -193,17 +191,29 @@ def main():
                         elif "bounding_boxes" in res["result"].keys():
                             # ~ print('Found %d bounding boxes (%d ms.)' % (len(res["result"]["bounding_boxes"]), res['timing']['dsp'] + res['timing']['classification']))
                             for bb in res["result"]["bounding_boxes"]:
-                                if bb['value'] < 0.6: continue
+                                # ~ if bb['value'] < 0.6: continue
                                 # ~ print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
-                                detection_timestamps.append(current_time)  # Record detection time
                                 img = cv2.rectangle(img, (bb['x'], bb['y']), (bb['x'] + bb['width'], bb['y'] + bb['height']), (255, 0, 0), 1)
-                        
+                                target = (81, 52)
+                                distance = math.floor(math.sqrt(((bb['x'] - target[0]) ** 2) + ((bb['y'] - target[1]) ** 2)))
+                                
+                                if distance < 15:
+                                    detection_timestamps.append(current_time)  # Record detection time
+                                    RelayState = GPIO.HIGH
+                                else:
+                                    RelayState = GPIO.LOW
+                        else:
+                            RelayState = GPIO.LOW
                         check_for_consistent_detections(executor)  # Check for consistent detections
+                        # ~ RelayState = GPIO.HIGH
+                        # ~ print(RelayState)
+                        GPIO.output(RelayPump, RelayState)
                         # ~ next_frame = now() + 100
                         next_frame = now() + 10
                         
                     if (show_camera):
                         cv2.imshow('Drinking Container Presence Detection', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+                        
                         if cv2.waitKey(1) == ord('q'):
                             break
         finally:
