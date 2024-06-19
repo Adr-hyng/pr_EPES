@@ -90,17 +90,16 @@ def check_for_consistent_detections(executor):
         dispense_state = GPIO.input(DispenseSwitch)
         
         # IF VL53L0X get its default max range, then there's no object, so stop dispensing.
-        
         # EXECUTE only this TTS when initially detected the container, then resets
         # after there's no object detected from ToF Sensor.
         if dispense_state == 1:
-            # ~ GPIO.output(RelayPump,GPIO.HIGH)
-            print("TURN ON")
+            GPIO.output(RelayPump,GPIO.HIGH)
+            # ~ executor.submit(run_tts, "A container is detected. Please stand still.")
+            # ~ print("TURN ON")
         else:
-            # ~ GPIO.output(RelayPump,GPIO.LOW)
-            print("TURN OFF")
+            GPIO.output(RelayPump,GPIO.LOW)
+            # ~ print("TURN OFF")
             
-        # ~ executor.submit(run_tts, "A container is detected. Please stand still.")
         detection_timestamps.clear()  # Reset detections to avoid repeated actions
 
 def now():
@@ -166,7 +165,7 @@ def main():
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for res, img in runner.classifier(videoCaptureDeviceId):
                     # Dispense Button
-                    print("Range: {0}mm".format(vl53L0X.range))
+                    # ~ print("Range: {0}mm".format(vl53L0X.range))
                     dispense_state = GPIO.input(DispenseSwitch)
                     automatic_state = GPIO.input(AutoSwitch)
                     
@@ -174,6 +173,8 @@ def main():
                         if not dispense_state: GPIO.output(RelayPump,GPIO.LOW)
                         else: GPIO.output(RelayPump,GPIO.HIGH)
                     else:
+                        if vl53L0X.range < 100:
+                            GPIO.output(RelayPump,GPIO.LOW)
                         if (next_frame > now()):
                             time.sleep((next_frame - now()) / 1000)
                             
@@ -192,7 +193,7 @@ def main():
                         elif "bounding_boxes" in res["result"].keys():
                             # ~ print('Found %d bounding boxes (%d ms.)' % (len(res["result"]["bounding_boxes"]), res['timing']['dsp'] + res['timing']['classification']))
                             for bb in res["result"]["bounding_boxes"]:
-                                if bb['value'] < 0.5: continue
+                                if bb['value'] < 0.6: continue
                                 # ~ print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
                                 detection_timestamps.append(current_time)  # Record detection time
                                 img = cv2.rectangle(img, (bb['x'], bb['y']), (bb['x'] + bb['width'], bb['y'] + bb['height']), (255, 0, 0), 1)
