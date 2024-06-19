@@ -1,4 +1,5 @@
 
+
 def run_tts(args):
     import subprocess
     try:
@@ -24,12 +25,12 @@ def is_process_running(process_name):
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
     return False
-
+    
 
 if __name__ == "__main__":
     # ~ run_tts("Hello, World")
-    process_name = "ttsDemo"
-    if is_process_running(process_name):
-        print(f"{process_name} is running.")
-    else:
-        print(f"{process_name} is not running.")
+    # ~ process_name = "ttsDemo"
+    # ~ if is_process_running(process_name):
+        # ~ print(f"{process_name} is running.")
+    # ~ else:
+        # ~ print(f"{process_name} is not running.")

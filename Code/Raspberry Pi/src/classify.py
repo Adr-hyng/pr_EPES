@@ -15,17 +15,27 @@ import board
 import busio
 import adafruit_vl53l0x
 
+# Button and Relay
+import RPi.GPIO as GPIO
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+DispenseSwitch = 27
+AutoSwitch = 22
+RelayPump = 17
+GPIO.setup(DispenseSwitch,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(AutoSwitch,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(RelayPump,GPIO.OUT)
 
 # ToF Sensor
 i2c = busio.I2C(board.SCL, board.SDA)
 vl53L0X = adafruit_vl53l0x.VL53L0X(i2c)
-vl53L0X.measurement_timing_budget = 200000 # Slow, Accurate
+# ~ vl53L0X.measurement_timing_budget = 200000 # Slow, Accurate
 
 
 runner = None
 is_speaking = False
 detection_timestamps = []  # List to store timestamps of detections
-min_detections = 3  # Minimum number of detections required within 2 seconds
+min_detections = 30  # Minimum number of detections required within 2 seconds
 frequency_millis = 2000 # Number of milliseconds to detect it is consistent container.
 
 # if you don't want to see a camera preview, set this to False
@@ -81,6 +91,7 @@ def check_for_consistent_detections(executor):
         
         # EXECUTE only this TTS when initially detected the container, then resets
         # after there's no object detected from ToF Sensor.
+        print("Range: {0}mm".format(vl53L0X.range))
         # ~ executor.submit(run_tts, "A container is detected. Please stand still.")
         detection_timestamps.clear()  # Reset detections to avoid repeated actions
 
@@ -146,38 +157,45 @@ def main():
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for res, img in runner.classifier(videoCaptureDeviceId):
-                    if (next_frame > now()):
-                        time.sleep((next_frame - now()) / 1000)
-                        
-                    current_time = now()  # Get current time in milliseconds
-                    remove_old_detections(current_time)  # Remove old detections
-
-                    # print('classification runner response', res)
-
-                    if "classification" in res["result"].keys():
-                        print('Result (%d ms.) ' % (res['timing']['dsp'] + res['timing']['classification']), end='')
-                        for label in labels:
-                            score = res['result']['classification'][label]
-                            print('%s: %.2f\t' % (label, score), end='')
-                        print('', flush=True)
-
-                    elif "bounding_boxes" in res["result"].keys():
-                        # ~ print('Found %d bounding boxes (%d ms.)' % (len(res["result"]["bounding_boxes"]), res['timing']['dsp'] + res['timing']['classification']))
-                        for bb in res["result"]["bounding_boxes"]:
-                            if bb['value'] < 0.90: continue
-                            # ~ print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
-                            print("Range: {0}mm".format(vl53L0X.range))
-                            detection_timestamps.append(current_time)  # Record detection time
-                            img = cv2.rectangle(img, (bb['x'], bb['y']), (bb['x'] + bb['width'], bb['y'] + bb['height']), (255, 0, 0), 1)
+                    # Dispense Button
+                    dispense_state = GPIO.input(DispenseSwitch)
+                    automatic_state = GPIO.input(AutoSwitch)
                     
-                    check_for_consistent_detections(executor)  # Check for consistent detections
+                    if automatic_state == 0:
+                        if not dispense_state: GPIO.output(RelayPump,GPIO.LOW)
+                        else: GPIO.output(RelayPump,GPIO.HIGH)
+                    else:
+                        if (next_frame > now()):
+                            time.sleep((next_frame - now()) / 1000)
+                            
+                        current_time = now()  # Get current time in milliseconds
+                        remove_old_detections(current_time)  # Remove old detections
+
+                        # print('classification runner response', res)
+
+                        if "classification" in res["result"].keys():
+                            print('Result (%d ms.) ' % (res['timing']['dsp'] + res['timing']['classification']), end='')
+                            for label in labels:
+                                score = res['result']['classification'][label]
+                                print('%s: %.2f\t' % (label, score), end='')
+                            print('', flush=True)
+
+                        elif "bounding_boxes" in res["result"].keys():
+                            # ~ print('Found %d bounding boxes (%d ms.)' % (len(res["result"]["bounding_boxes"]), res['timing']['dsp'] + res['timing']['classification']))
+                            for bb in res["result"]["bounding_boxes"]:
+                                if bb['value'] < 0.90: continue
+                                # ~ print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
+                                detection_timestamps.append(current_time)  # Record detection time
+                                img = cv2.rectangle(img, (bb['x'], bb['y']), (bb['x'] + bb['width'], bb['y'] + bb['height']), (255, 0, 0), 1)
+                        
+                        check_for_consistent_detections(executor)  # Check for consistent detections
+                        # ~ next_frame = now() + 100
+                        next_frame = now() + 10
+                        
                     if (show_camera):
                         cv2.imshow('Drinking Container Presence Detection', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
                         if cv2.waitKey(1) == ord('q'):
                             break
-
-                    # ~ next_frame = now() + 100
-                    next_frame = now() + 10
         finally:
             if runner:
                 runner.stop()
