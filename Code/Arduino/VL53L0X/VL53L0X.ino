@@ -31,7 +31,7 @@ VL53L0X sensor;
 #define HIGH_ACCURACY
 
 
-void setup()
+void setup() 
 {
   Serial.begin(9600);
   Wire.begin();
