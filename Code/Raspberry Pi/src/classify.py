@@ -35,8 +35,9 @@ vl53L0X = adafruit_vl53l0x.VL53L0X(i2c)
 runner = None
 is_speaking = False
 detection_timestamps = []  # List to store timestamps of detections
-min_detections = 30  # Minimum number of detections required within 2 seconds
+min_detections = 15  # Minimum number of detections required within 2 seconds
 frequency_millis = 2000 # Number of milliseconds to detect it is consistent container.
+dispense_state = 0
 
 # if you don't want to see a camera preview, set this to False
 show_camera = True
@@ -86,12 +87,19 @@ def check_for_consistent_detections(executor):
     if len(detection_timestamps) >= min_detections:
         print("Consistent container detections detected!")
         # Execute your action here
+        dispense_state = GPIO.input(DispenseSwitch)
         
         # IF VL53L0X get its default max range, then there's no object, so stop dispensing.
         
         # EXECUTE only this TTS when initially detected the container, then resets
         # after there's no object detected from ToF Sensor.
-        print("Range: {0}mm".format(vl53L0X.range))
+        if dispense_state == 1:
+            # ~ GPIO.output(RelayPump,GPIO.HIGH)
+            print("TURN ON")
+        else:
+            # ~ GPIO.output(RelayPump,GPIO.LOW)
+            print("TURN OFF")
+            
         # ~ executor.submit(run_tts, "A container is detected. Please stand still.")
         detection_timestamps.clear()  # Reset detections to avoid repeated actions
 
@@ -158,6 +166,7 @@ def main():
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for res, img in runner.classifier(videoCaptureDeviceId):
                     # Dispense Button
+                    print("Range: {0}mm".format(vl53L0X.range))
                     dispense_state = GPIO.input(DispenseSwitch)
                     automatic_state = GPIO.input(AutoSwitch)
                     
@@ -183,7 +192,7 @@ def main():
                         elif "bounding_boxes" in res["result"].keys():
                             # ~ print('Found %d bounding boxes (%d ms.)' % (len(res["result"]["bounding_boxes"]), res['timing']['dsp'] + res['timing']['classification']))
                             for bb in res["result"]["bounding_boxes"]:
-                                if bb['value'] < 0.90: continue
+                                if bb['value'] < 0.5: continue
                                 # ~ print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
                                 detection_timestamps.append(current_time)  # Record detection time
                                 img = cv2.rectangle(img, (bb['x'], bb['y']), (bb['x'] + bb['width'], bb['y'] + bb['height']), (255, 0, 0), 1)
