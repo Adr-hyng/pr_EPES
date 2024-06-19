@@ -12,10 +12,6 @@ import concurrent.futures
 from edge_impulse_linux.image import ImageImpulseRunner
 import psutil
 
-import board
-import busio
-import adafruit_vl53l0x
-
 # Button and Relay
 import RPi.GPIO as GPIO
 GPIO.setwarnings(False)
@@ -28,17 +24,13 @@ GPIO.setup(DispenseSwitch,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(AutoSwitch,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(RelayPump,GPIO.OUT)
 
-# ToF Sensor
-# ~ i2c = busio.I2C(board.SCL, board.SDA)
-# ~ vl53L0X = adafruit_vl53l0x.VL53L0X(i2c)
-# ~ vl53L0X.measurement_timing_budget = 200000 # Slow, Accurate
-
-
 runner = None
 is_speaking = False
+
+
 detection_timestamps = []  # List to store timestamps of detections
-min_detections = 15  # Minimum number of detections required within 2 seconds
-frequency_millis = 2000 # Number of milliseconds to detect it is consistent container.
+min_detections = 10  # 20 = 500
+frequency_millis = 500 # Number of milliseconds to detect it is consistent container.
 dispense_state = 0
 
 # if you don't want to see a camera preview, set this to False
@@ -86,21 +78,15 @@ def remove_old_detections(current_time):
 def check_for_consistent_detections(executor):
     """Check if there are enough recent detections to trigger an action."""
     global detection_timestamps
+    global RelayState
     if len(detection_timestamps) >= min_detections:
         print("Consistent container detections detected!")
-        # Execute your action here
         dispense_state = GPIO.input(DispenseSwitch)
-        
-        # IF VL53L0X get its default max range, then there's no object, so stop dispensing.
-        # EXECUTE only this TTS when initially detected the container, then resets
-        # after there's no object detected from ToF Sensor.
-        if dispense_state == 1:
-            RelayState = GPIO.HIGH
-            # ~ executor.submit(run_tts, "A container is detected. Please stand still.")
-        else:
-            RelayState = GPIO.LOW
-        detection_timestamps.clear()  # Reset detections to avoid repeated actions
-
+        RelayState = GPIO.HIGH
+        detection_timestamps.clear()
+    else:
+        RelayState = GPIO.LOW
+    
 def now():
     return round(time.time() * 1000)
 
@@ -129,14 +115,18 @@ def sigint_handler(sig, frame):
 signal.signal(signal.SIGINT, sigint_handler)
 
 def main():
+    global RelayState
     model = "modelfile.eim"
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     modelfile = os.path.join(dir_path, model)
+    last_evaluation_time = 0
 
     print('MODEL:', modelfile)
     
     RelayState = GPIO.LOW
+    closest_bb = None
+    closest_distance = float("inf")
 
     with ImageImpulseRunner(modelfile) as runner:
         try:
@@ -172,6 +162,7 @@ def main():
                     if automatic_state == 0:
                         if not dispense_state: RelayState = GPIO.LOW
                         else: RelayState = GPIO.HIGH
+                        GPIO.output(RelayPump, RelayState)    
                     else:
                         if (next_frame > now()):
                             time.sleep((next_frame - now()) / 1000)
@@ -190,27 +181,48 @@ def main():
 
                         elif "bounding_boxes" in res["result"].keys():
                             # ~ print('Found %d bounding boxes (%d ms.)' % (len(res["result"]["bounding_boxes"]), res['timing']['dsp'] + res['timing']['classification']))
-                            for bb in res["result"]["bounding_boxes"]:
-                                # ~ if bb['value'] < 0.6: continue
-                                # ~ print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
-                                img = cv2.rectangle(img, (bb['x'], bb['y']), (bb['x'] + bb['width'], bb['y'] + bb['height']), (255, 0, 0), 1)
-                                target = (81, 52)
-                                distance = math.floor(math.sqrt(((bb['x'] - target[0]) ** 2) + ((bb['y'] - target[1]) ** 2)))
+                            
+                            target = (81, 52)
+                            sorted_bounding_boxes = sorted(
+                                res["result"]["bounding_boxes"],
+                                key=lambda bb: math.sqrt(
+                                    (bb['x'] + bb['width'] // 2 - target[0]) ** 2 + (bb['y'] + bb['height'] // 2 - target[1]) ** 2
+                                )
+                            )
+                            
+                            # ~ for bb in res["result"]["bounding_boxes"]:
+                                # ~ bb_center_x = bb['x'] + bb['width'] // 2
+                                # ~ bb_center_y = bb['y'] + bb['height'] // 2
                                 
-                                if distance < 15:
-                                    detection_timestamps.append(current_time)  # Record detection time
-                                    RelayState = GPIO.HIGH
-                                else:
-                                    RelayState = GPIO.LOW
-                        else:
-                            RelayState = GPIO.LOW
-                        check_for_consistent_detections(executor)  # Check for consistent detections
-                        # ~ RelayState = GPIO.HIGH
-                        # ~ print(RelayState)
-                        GPIO.output(RelayPump, RelayState)
-                        # ~ next_frame = now() + 100
-                        next_frame = now() + 10
+                                # ~ distance = math.floor(math.sqrt((bb_center_x - target[0]) ** 2 + (bb_center_y - target[1]) ** 2))
+                                
+                                # ~ img = cv2.rectangle(img, (bb['x'], bb['y']), (bb['x'] + bb['width'], bb['y'] + bb['height']), (255, 0, 0), 1)
+                                # ~ if distance < 10:
+                                    # ~ detection_timestamps.append(current_time)
+                                    
+                            if sorted_bounding_boxes:
+                                closest_bb = sorted_bounding_boxes[0]
+                                bb_center_x = closest_bb['x'] + closest_bb['width'] // 2
+                                bb_center_y = closest_bb['y'] + closest_bb['height'] // 2
+                                closest_distance = math.floor(math.sqrt((bb_center_x - target[0]) ** 2 + (bb_center_y - target[1]) ** 2))
+                            
+                                if closest_distance < 15:
+                                    detection_timestamps.append(current_time)
+                                    img = cv2.rectangle(img, (closest_bb['x'], closest_bb['y']), (closest_bb['x'] + closest_bb['width'], closest_bb['y'] + closest_bb['height']), (255, 0, 0), 1)
+                                    cv2.rectangle(img, (target[0], target[1]), (target[0] + 25, target[1] + 25), (0, 0, 255), 1)
+                                
+                        # ~ else:
+                            # ~ RelayState = GPIO.LOW
+                        next_frame = now() + 5
+                        cv2.rectangle(img, (target[0] - 25 // 2, target[1] - 25 // 2), (target[0] + 25, target[1] + 25), (0, 255, 0), 2)
                         
+                        # Check if 2 seconds have passed since the last evaluation
+                        if current_time - last_evaluation_time >= frequency_millis:
+                            check_for_consistent_detections(executor)  # Check for consistent detections    
+                            print(RelayState)
+                            GPIO.output(RelayPump, RelayState)    
+                            last_evaluation_time = current_time  # Update the last evaluation time
+                    
                     if (show_camera):
                         cv2.imshow('Drinking Container Presence Detection', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
                         
