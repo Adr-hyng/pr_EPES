@@ -147,7 +147,7 @@ extern "C" {
   //   resulting from noise in the touch overlay detection
   // - For config details, please see:
   //   https://github.com/ImpulseAdventure/GUIslice/wiki/Configuring-Touch-Pressure
-  #define ADATOUCH_PRESS_MIN  400
+  #define ADATOUCH_PRESS_MIN  100
   #define ADATOUCH_PRESS_MAX  2500
 
   // -----------------------------------------------------------------------------
