@@ -17,6 +17,7 @@
 
 // ------------------------------------------------
 // Program Globals
+bool g_ButtonFlags[4] = {false, false, false, false}; // Glowing buttons
 // ------------------------------------------------
 
 // Save some element references for direct access
@@ -29,6 +30,26 @@ static int16_t DebugOut(char ch) { if (ch == (char)'\n') Serial.println(""); els
 // ------------------------------------------------
 // Callback Methods
 // ------------------------------------------------
+// Retoggle Buttons
+void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem) {
+    // Iterate through the button IDs
+    for (short i = E_ELEM_IMAGEBTN13; i <= E_ELEM_IMAGEBTN15; i++) {
+        // Get the element reference for the current button ID
+        gslc_tsElemRef* pElemRef = gslc_PageFindElemById(pGui, gslc_GetPageCur(pGui), i);
+
+        if (pElemRef == nullptr) {
+            // Skip if the element reference is invalid
+            continue;
+        }
+
+        // Set the button flags: true only for the selected button
+        g_ButtonFlags[i] = (i == selBtnElem);
+
+        // Update glow state: Glow only the selected button, unglow others
+        gslc_ElemSetGlow(pGui, pElemRef, g_ButtonFlags[i]);
+    }
+}
+
 // Common Button callback
 bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY)
 {
@@ -42,12 +63,15 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
     switch (pElem->nId) {
 //<Button Enums !Start!>
       case E_ELEM_IMAGEBTN13:
+        CbRetoggleBtn(pGui, E_ELEM_IMAGEBTN13);
         Serial.print("AUTO PRESSED");
         break;
       case E_ELEM_IMAGEBTN14:
+        CbRetoggleBtn(pGui, E_ELEM_IMAGEBTN14);
         Serial.print("SAFE PRESSED");
         break;
       case E_ELEM_IMAGEBTN15:
+        CbRetoggleBtn(pGui, E_ELEM_IMAGEBTN15);
         Serial.print("TRADITIONAL PRESSED");
         break;
 //<Button Enums !End!>
