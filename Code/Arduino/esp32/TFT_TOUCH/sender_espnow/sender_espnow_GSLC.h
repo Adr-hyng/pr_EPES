@@ -53,8 +53,8 @@ extern "C" const unsigned short TRAD_BUTTON_SEL[] PROGMEM;
 // ------------------------------------------------
 //<Enum !Start!>
 enum {E_PG_MAIN};
-enum {E_ELEM_IMAGE5,E_ELEM_IMAGEBTN13,E_ELEM_IMAGEBTN14
-      ,E_ELEM_IMAGEBTN15,E_ELEM_TEXT2,E_ELEM_TEXT3,E_ELEM_TEXT4};
+enum {E_ELEM_IMAGE5,AutoBtn,SafeBtn
+      ,TradBtn,E_ELEM_TEXT2,SelTemperature,E_ELEM_TEXT4};
 // Must use separate enum for fonts with MAX_FONT at end to use gslc_FontSet.
 enum {E_SEVEN_SEGMENT14,E_SEVEN_SEGMENT30,MAX_FONT};
 //<Enum !End!>
@@ -150,8 +150,8 @@ void InitGUIslice_gen()
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
   gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
   
-  // Create E_ELEM_TEXT3 text label
-  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT3,E_PG_MAIN,(gslc_tsRect){20,240,49,42},
+  // Create SelTemperature text label
+  pElemRef = gslc_ElemCreateTxt(&m_gui,SelTemperature,E_PG_MAIN,(gslc_tsRect){20,240,49,42},
     (char*)"75",0,E_SEVEN_SEGMENT30);
   gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_BOT_RIGHT);
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
@@ -167,22 +167,22 @@ void InitGUIslice_gen()
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
   gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
   
-  // Create E_ELEM_IMAGEBTN13 button with image label
-  pElemRef = gslc_ElemCreateBtnImg(&m_gui,E_ELEM_IMAGEBTN13,E_PG_MAIN,(gslc_tsRect){154,12,77,77},
+  // Create AutoBtn button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,AutoBtn,E_PG_MAIN,(gslc_tsRect){154,12,77,77},
           gslc_GetImageFromProg((const unsigned char*)AUTO_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)AUTO_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
   gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
   
-  // Create E_ELEM_IMAGEBTN14 button with image label
-  pElemRef = gslc_ElemCreateBtnImg(&m_gui,E_ELEM_IMAGEBTN14,E_PG_MAIN,(gslc_tsRect){154,119,77,77},
+  // Create SafeBtn button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,SafeBtn,E_PG_MAIN,(gslc_tsRect){154,119,77,77},
           gslc_GetImageFromProg((const unsigned char*)SAFE_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)SAFE_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
   gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
 
-  // Create E_ELEM_IMAGEBTN15 button with image label
-  pElemRef = gslc_ElemCreateBtnImg(&m_gui,E_ELEM_IMAGEBTN15,E_PG_MAIN,(gslc_tsRect){154,226,77,77},
+  // Create TradBtn button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,TradBtn,E_PG_MAIN,(gslc_tsRect){154,226,77,77},
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);

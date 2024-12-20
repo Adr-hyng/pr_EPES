@@ -33,7 +33,7 @@ static int16_t DebugOut(char ch) { if (ch == (char)'\n') Serial.println(""); els
 // Retoggle Buttons
 void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem) {
     // Iterate through the button IDs
-    for (short i = E_ELEM_IMAGEBTN13; i <= E_ELEM_IMAGEBTN15; i++) {
+    for (short i = AutoBtn; i <= TradBtn; i++) {
         // Get the element reference for the current button ID
         gslc_tsElemRef* pElemRef = gslc_PageFindElemById(pGui, gslc_GetPageCur(pGui), i);
 
@@ -63,16 +63,16 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
     // From the element's ID we can determine which button was pressed.
     switch (pElem->nId) {
 //<Button Enums !Start!>
-      case E_ELEM_IMAGEBTN13:
-        CbRetoggleBtn(pGui, E_ELEM_IMAGEBTN13);
+      case AutoBtn:
+        CbRetoggleBtn(pGui, AutoBtn);
         Serial.print("AUTO PRESSED");
         break;
-      case E_ELEM_IMAGEBTN14:
-        CbRetoggleBtn(pGui, E_ELEM_IMAGEBTN14);
+      case SafeBtn:
+        CbRetoggleBtn(pGui, SafeBtn);
         Serial.print("SAFE PRESSED");
         break;
-      case E_ELEM_IMAGEBTN15:
-        CbRetoggleBtn(pGui, E_ELEM_IMAGEBTN15);
+      case TradBtn:
+        CbRetoggleBtn(pGui, TradBtn);
         Serial.print("TRADITIONAL PRESSED");
         break;
 //<Button Enums !End!>
