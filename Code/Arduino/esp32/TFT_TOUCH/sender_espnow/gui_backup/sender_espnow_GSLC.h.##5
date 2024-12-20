@@ -38,8 +38,8 @@
   #error E_PROJECT_OPTIONS tab->Graphics Library should be Adafruit_GFX
 #endif
 #include <TFT_eSPI.h>
-#include "Seven_Segment10pt7b.h"
-#include "Seven_Segment22pt7b.h"
+#include "Seven_Segment14pt7b.h"
+#include "Seven_Segment30pt7b.h"
 //<Fonts !End!>
 
 // ------------------------------------------------
@@ -63,10 +63,10 @@ extern "C" const unsigned short TRAD_BUTTON_SEL[] PROGMEM;
 // ------------------------------------------------
 //<Enum !Start!>
 enum {E_PG_MAIN};
-enum {AutoBtn,E_ELEM_TEXT2,E_ELEM_TEXT4,ImgRefThermo,SafeBtn
-      ,SelTemperature,TradBtn};
+enum {ImgRefThermo,AutoBtn,SafeBtn
+      ,TradBtn,E_ELEM_TEXT2,SelTemperature,E_ELEM_TEXT4};
 // Must use separate enum for fonts with MAX_FONT at end to use gslc_FontSet.
-enum {E_SEVEN_SEGMENT10,E_SEVEN_SEGMENT22,MAX_FONT};
+enum {E_SEVEN_SEGMENT14,E_SEVEN_SEGMENT30,MAX_FONT};
 //<Enum !End!>
 
 // ------------------------------------------------
@@ -151,8 +151,8 @@ void InitGUIslice_gen()
   // Load Fonts
   // ------------------------------------------------
 //<Load_Fonts !Start!>
-    if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT10,GSLC_FONTREF_PTR,&Seven_Segment10pt7b,1)) { return; }
-    if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT22,GSLC_FONTREF_PTR,&Seven_Segment22pt7b,1)) { return; }
+    if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT14,GSLC_FONTREF_PTR,&Seven_Segment14pt7b,1)) { return; }
+    if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT30,GSLC_FONTREF_PTR,&Seven_Segment30pt7b,1)) { return; }
 //<Load_Fonts !End!>
 
 //<InitGUI !Start!>
@@ -167,25 +167,28 @@ void InitGUIslice_gen()
 
   // -----------------------------------
   // PAGE: E_PG_MAIN
-  
-  
+
   // Create E_ELEM_TEXT2 text label
-  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT2,E_PG_MAIN,(gslc_tsRect){80,270,15,30},
-    (char*)"C",0,E_SEVEN_SEGMENT22);
+  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT2,E_PG_MAIN,(gslc_tsRect){100,240,20,42},
+    (char*)"C",0,E_SEVEN_SEGMENT30);
   gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_BOT_RIGHT);
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
   gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
   
   // Create SelTemperature text label
-  pElemRef = gslc_ElemCreateTxt(&m_gui,SelTemperature,E_PG_MAIN,(gslc_tsRect){10,270,37,30},
-    (char*)"75",0,E_SEVEN_SEGMENT22);
+  pElemRef = gslc_ElemCreateTxt(&m_gui,SelTemperature,E_PG_MAIN,(gslc_tsRect){20,240,49,42},
+    (char*)"75",0,E_SEVEN_SEGMENT30);
   gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_BOT_RIGHT);
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
   gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
+ 
+  // Create ImgRefThermo using Image 
+  pElemRef = gslc_ElemCreateImg(&m_gui,ImgRefThermo,E_PG_MAIN,(gslc_tsRect){23,16,91,205},
+    gslc_GetImageFromProg((const unsigned char*)THERMOMETER,GSLC_IMGREF_FMT_BMP24));
   
   // Create E_ELEM_TEXT4 text label
-  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT4,E_PG_MAIN,(gslc_tsRect){60,270,8,14},
-    (char*)"0",0,E_SEVEN_SEGMENT10);
+  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT4,E_PG_MAIN,(gslc_tsRect){80,240,20,19},
+    (char*)"o",0,E_SEVEN_SEGMENT14);
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
   gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
   
@@ -202,20 +205,15 @@ void InitGUIslice_gen()
           gslc_GetImageFromProg((const unsigned char*)SAFE_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
   gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
-  
+
   // Create TradBtn button with image label
   pElemRef = gslc_ElemCreateBtnImg(&m_gui,TradBtn,E_PG_MAIN,(gslc_tsRect){154,226,77,77},
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
-  gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
- 
-  // Create ImgRefThermo using Image 
-  pElemRef = gslc_ElemCreateImg(&m_gui,ImgRefThermo,E_PG_MAIN,(gslc_tsRect){20,20,78,240},
-    gslc_GetImageFromProg((const unsigned char*)THERMOMETER,GSLC_IMGREF_FMT_BMP24));
-//<InitGUI !End!>
 
-//<Startup !Start!>
+  // Default it is Traditional Mode, could be great to use memory to save the last mode.
+
   // Set the default glowing button based on last_mode
   if (last_mode == 0) {
       // Set Traditional Mode as active
@@ -233,6 +231,9 @@ void InitGUIslice_gen()
       gslc_ElemSetGlowEn(&m_gui, pElemRef2, true);
       gslc_ElemSetGlow(&m_gui, pElemRef2, true);
   }
+//<InitGUI !End!>
+
+//<Startup !Start!>
   gslc_GuiRotate(&m_gui, 0);
 //<Startup !End!>
 

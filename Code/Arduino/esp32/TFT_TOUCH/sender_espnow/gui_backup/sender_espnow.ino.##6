@@ -35,7 +35,7 @@ void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigne
     }
 
     // Clear the element's background
-    gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FOCUS);
+    gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FULL);
 
     // Create an empty image reference for the second image
     gslc_tsImgRef emptyImgRef = gslc_GetImageFromProg(nullptr, GSLC_IMGREF_NONE);
@@ -46,7 +46,7 @@ void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigne
         emptyImgRef);
 
     // Trigger a redraw of the element to display the new image
-    gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FOCUS);
+    gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FULL);
 }
 
 
@@ -110,17 +110,11 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
     // From the element's ID we can determine which button was pressed.
     switch (pElem->nId) {
 //<Button Enums !Start!>
-      case AutoBtn:
-        save_mode_to_nvs(2); // Auto Mode
-        Serial.print("AUTO PRESSED");
+      case E_ELEM_IMAGEBTN13:
         break;
-      case SafeBtn:
-        save_mode_to_nvs(1); // Safe Mode
-        Serial.print("SAFE PRESSED");
+      case E_ELEM_IMAGEBTN14:
         break;
-      case TradBtn:
-        save_mode_to_nvs(0); // Traditional Mode
-        Serial.print("TRADITIONAL PRESSED");
+      case E_ELEM_IMAGEBTN15:
         break;
 //<Button Enums !End!>
       default:

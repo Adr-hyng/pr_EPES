@@ -51,9 +51,6 @@ extern "C" const unsigned short AUTO_BUTTON_SEL[] PROGMEM;
 extern "C" const unsigned short SAFE_BUTTON[] PROGMEM;
 extern "C" const unsigned short SAFE_BUTTON_SEL[] PROGMEM;
 extern "C" const unsigned short THERMOMETER[] PROGMEM;
-extern "C" const unsigned short THERMOMETER_1[] PROGMEM;
-extern "C" const unsigned short THERMOMETER_2[] PROGMEM;
-extern "C" const unsigned short THERMOMETER_3[] PROGMEM;
 extern "C" const unsigned short TRAD_BUTTON[] PROGMEM;
 extern "C" const unsigned short TRAD_BUTTON_SEL[] PROGMEM;
 //<Resources !End!>
@@ -63,8 +60,8 @@ extern "C" const unsigned short TRAD_BUTTON_SEL[] PROGMEM;
 // ------------------------------------------------
 //<Enum !Start!>
 enum {E_PG_MAIN};
-enum {AutoBtn,E_ELEM_TEXT2,E_ELEM_TEXT4,ImgRefThermo,SafeBtn
-      ,SelTemperature,TradBtn};
+enum {E_ELEM_IMAGE6,E_ELEM_IMAGEBTN13,E_ELEM_IMAGEBTN14
+      ,E_ELEM_IMAGEBTN15,E_ELEM_TEXT2,E_ELEM_TEXT3,E_ELEM_TEXT4};
 // Must use separate enum for fonts with MAX_FONT at end to use gslc_FontSet.
 enum {E_SEVEN_SEGMENT10,E_SEVEN_SEGMENT22,MAX_FONT};
 //<Enum !End!>
@@ -176,8 +173,8 @@ void InitGUIslice_gen()
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
   gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
   
-  // Create SelTemperature text label
-  pElemRef = gslc_ElemCreateTxt(&m_gui,SelTemperature,E_PG_MAIN,(gslc_tsRect){10,270,37,30},
+  // Create E_ELEM_TEXT3 text label
+  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT3,E_PG_MAIN,(gslc_tsRect){10,270,37,30},
     (char*)"75",0,E_SEVEN_SEGMENT22);
   gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_BOT_RIGHT);
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
@@ -189,50 +186,30 @@ void InitGUIslice_gen()
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
   gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
   
-  // Create AutoBtn button with image label
-  pElemRef = gslc_ElemCreateBtnImg(&m_gui,AutoBtn,E_PG_MAIN,(gslc_tsRect){154,12,77,77},
+  // Create E_ELEM_IMAGEBTN13 button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,E_ELEM_IMAGEBTN13,E_PG_MAIN,(gslc_tsRect){154,12,77,77},
           gslc_GetImageFromProg((const unsigned char*)AUTO_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)AUTO_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
-  gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
   
-  // Create SafeBtn button with image label
-  pElemRef = gslc_ElemCreateBtnImg(&m_gui,SafeBtn,E_PG_MAIN,(gslc_tsRect){154,119,77,77},
+  // Create E_ELEM_IMAGEBTN14 button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,E_ELEM_IMAGEBTN14,E_PG_MAIN,(gslc_tsRect){154,119,77,77},
           gslc_GetImageFromProg((const unsigned char*)SAFE_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)SAFE_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
-  gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
   
-  // Create TradBtn button with image label
-  pElemRef = gslc_ElemCreateBtnImg(&m_gui,TradBtn,E_PG_MAIN,(gslc_tsRect){154,226,77,77},
+  // Create E_ELEM_IMAGEBTN15 button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,E_ELEM_IMAGEBTN15,E_PG_MAIN,(gslc_tsRect){154,226,77,77},
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
-  gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
  
-  // Create ImgRefThermo using Image 
-  pElemRef = gslc_ElemCreateImg(&m_gui,ImgRefThermo,E_PG_MAIN,(gslc_tsRect){20,20,78,240},
+  // Create E_ELEM_IMAGE6 using Image 
+  pElemRef = gslc_ElemCreateImg(&m_gui,E_ELEM_IMAGE6,E_PG_MAIN,(gslc_tsRect){20,20,78,240},
     gslc_GetImageFromProg((const unsigned char*)THERMOMETER,GSLC_IMGREF_FMT_BMP24));
 //<InitGUI !End!>
 
 //<Startup !Start!>
-  // Set the default glowing button based on last_mode
-  if (last_mode == 0) {
-      // Set Traditional Mode as active
-      gslc_tsElemRef* pElemRef2 = gslc_PageFindElemById(&m_gui, E_PG_MAIN, TradBtn);
-      gslc_ElemSetGlowEn(&m_gui, pElemRef2, true);
-      gslc_ElemSetGlow(&m_gui, pElemRef2, true);
-  } else if (last_mode == 1) {
-      // Set Safe Mode as active
-      gslc_tsElemRef* pElemRef2 = gslc_PageFindElemById(&m_gui, E_PG_MAIN, SafeBtn);
-      gslc_ElemSetGlowEn(&m_gui, pElemRef2, true);
-      gslc_ElemSetGlow(&m_gui, pElemRef2, true);
-  } else if (last_mode == 2) {
-      // Set Auto Mode as active
-      gslc_tsElemRef* pElemRef2 = gslc_PageFindElemById(&m_gui, E_PG_MAIN, AutoBtn);
-      gslc_ElemSetGlowEn(&m_gui, pElemRef2, true);
-      gslc_ElemSetGlow(&m_gui, pElemRef2, true);
-  }
   gslc_GuiRotate(&m_gui, 0);
 //<Startup !End!>
 
