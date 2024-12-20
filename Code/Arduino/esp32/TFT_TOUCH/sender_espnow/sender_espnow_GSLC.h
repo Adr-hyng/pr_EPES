@@ -186,7 +186,10 @@ void InitGUIslice_gen()
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
-  gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
+
+  // Default it is Traditional Mode
+  gslc_ElemSetGlowEn(&m_gui, pElemRef, true);
+  gslc_ElemSetGlow(&m_gui, pElemRef, true);
 //<InitGUI !End!>
 
 //<Startup !Start!>
