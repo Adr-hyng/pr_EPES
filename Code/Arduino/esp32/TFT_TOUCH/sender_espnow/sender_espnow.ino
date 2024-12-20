@@ -46,6 +46,7 @@ void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem) {
         g_ButtonFlags[i] = (i == selBtnElem);
 
         // Update glow state: Glow only the selected button, unglow others
+        gslc_ElemSetGlowEn(pGui, pElemRef, g_ButtonFlags[i]);
         gslc_ElemSetGlow(pGui, pElemRef, g_ButtonFlags[i]);
     }
 }

@@ -172,18 +172,21 @@ void InitGUIslice_gen()
           gslc_GetImageFromProg((const unsigned char*)AUTO_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)AUTO_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
+  gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
   
   // Create E_ELEM_IMAGEBTN14 button with image label
   pElemRef = gslc_ElemCreateBtnImg(&m_gui,E_ELEM_IMAGEBTN14,E_PG_MAIN,(gslc_tsRect){154,119,77,77},
           gslc_GetImageFromProg((const unsigned char*)SAFE_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)SAFE_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
-  
+  gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
+
   // Create E_ELEM_IMAGEBTN15 button with image label
   pElemRef = gslc_ElemCreateBtnImg(&m_gui,E_ELEM_IMAGEBTN15,E_PG_MAIN,(gslc_tsRect){154,226,77,77},
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON,GSLC_IMGREF_FMT_BMP24),
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
+  gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
 //<InitGUI !End!>
 
 //<Startup !Start!>
