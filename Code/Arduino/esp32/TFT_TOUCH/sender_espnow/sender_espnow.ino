@@ -17,7 +17,6 @@
 
 // ------------------------------------------------
 // Program Globals
-bool g_ButtonFlags[4] = {false, false, false, false}; // Glowing buttons
 // ------------------------------------------------
 
 // Save some element references for direct access
@@ -30,6 +29,30 @@ static int16_t DebugOut(char ch) { if (ch == (char)'\n') Serial.println(""); els
 // ------------------------------------------------
 // Callback Methods
 // ------------------------------------------------
+void save_mode_to_nvs(int mode)
+{
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_set_i32(nvs_handle, NVS_KEY_MODE, mode);
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+    }
+}
+
+int load_mode_from_nvs()
+{
+    nvs_handle_t nvs_handle;
+    int32_t mode = 0; // Default to Traditional Mode
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_get_i32(nvs_handle, NVS_KEY_MODE, &mode);
+        nvs_close(nvs_handle);
+    }
+    return (int)mode; // Cast back to int if necessary
+}
+
+
 // Retoggle Buttons
 void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem) {
     // Iterate through the button IDs
@@ -64,21 +87,22 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
     switch (pElem->nId) {
 //<Button Enums !Start!>
       case AutoBtn:
-        CbRetoggleBtn(pGui, AutoBtn);
+        save_mode_to_nvs(2); // Auto Mode
         Serial.print("AUTO PRESSED");
         break;
       case SafeBtn:
-        CbRetoggleBtn(pGui, SafeBtn);
+        save_mode_to_nvs(1); // Safe Mode
         Serial.print("SAFE PRESSED");
         break;
       case TradBtn:
-        CbRetoggleBtn(pGui, TradBtn);
+        save_mode_to_nvs(0); // Traditional Mode
         Serial.print("TRADITIONAL PRESSED");
         break;
 //<Button Enums !End!>
       default:
         break;
     }
+    CbRetoggleBtn(pGui, pElem->nId);
   }
   return true;
 }

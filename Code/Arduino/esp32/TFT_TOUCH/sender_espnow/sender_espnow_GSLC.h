@@ -18,6 +18,13 @@
 #include "GUIslice.h"
 #include "GUIslice_drv.h"
 
+#include <nvs_flash.h>
+#include <nvs.h>
+
+// NVS namespace and key for storing the mode
+#define NVS_NAMESPACE "storage"
+#define NVS_KEY_MODE "last_mode"
+
 // Include any extended elements
 //<Includes !Start!>
 //<Includes !End!>
@@ -91,6 +98,7 @@ gslc_tsElemRef                  m_asPage1ElemRef[MAX_ELEM_PG_MAIN];
 
 // ------------------------------------------------
 // Program Globals
+bool g_ButtonFlags[4] = {false, false, false, true}; // Glowing buttons
 // ------------------------------------------------
 
 // Element References for direct access
@@ -103,6 +111,9 @@ static int16_t DebugOut(char ch);
 // ------------------------------------------------
 // Callback Methods
 // ------------------------------------------------
+void save_mode_to_nvs(int mode);
+int load_mode_from_nvs();
+void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem);
 bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY);
 bool CbCheckbox(void* pvGui, void* pvElemRef, int16_t nSelId, bool bState);
 bool CbDrawScanner(void* pvGui,void* pvElemRef,gslc_teRedrawType eRedraw);
@@ -120,6 +131,17 @@ void InitGUIslice_gen()
   gslc_tsElemRef* pElemRef = NULL;
 
   if (!gslc_Init(&m_gui,&m_drv,m_asPage,MAX_PAGE,m_asFont,MAX_FONT)) { return; }
+
+  // Initialize NVS
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    // Load the last mode from NVS
+    int last_mode = load_mode_from_nvs();
 
   // ------------------------------------------------
   // Load Fonts
@@ -141,8 +163,7 @@ void InitGUIslice_gen()
 
   // -----------------------------------
   // PAGE: E_PG_MAIN
-  
-  
+
   // Create E_ELEM_TEXT2 text label
   pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT2,E_PG_MAIN,(gslc_tsRect){100,240,20,42},
     (char*)"C",0,E_SEVEN_SEGMENT30);
@@ -187,9 +208,25 @@ void InitGUIslice_gen()
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
 
-  // Default it is Traditional Mode
-  gslc_ElemSetGlowEn(&m_gui, pElemRef, true);
-  gslc_ElemSetGlow(&m_gui, pElemRef, true);
+  // Default it is Traditional Mode, could be great to use memory to save the last mode.
+
+  // Set the default glowing button based on last_mode
+  if (last_mode == 0) {
+      // Set Traditional Mode as active
+      gslc_tsElemRef* pElemRef2 = gslc_PageFindElemById(&m_gui, E_PG_MAIN, TradBtn);
+      gslc_ElemSetGlowEn(&m_gui, pElemRef2, true);
+      gslc_ElemSetGlow(&m_gui, pElemRef2, true);
+  } else if (last_mode == 1) {
+      // Set Safe Mode as active
+      gslc_tsElemRef* pElemRef2 = gslc_PageFindElemById(&m_gui, E_PG_MAIN, SafeBtn);
+      gslc_ElemSetGlowEn(&m_gui, pElemRef2, true);
+      gslc_ElemSetGlow(&m_gui, pElemRef2, true);
+  } else if (last_mode == 2) {
+      // Set Auto Mode as active
+      gslc_tsElemRef* pElemRef2 = gslc_PageFindElemById(&m_gui, E_PG_MAIN, AutoBtn);
+      gslc_ElemSetGlowEn(&m_gui, pElemRef2, true);
+      gslc_ElemSetGlow(&m_gui, pElemRef2, true);
+  }
 //<InitGUI !End!>
 
 //<Startup !Start!>
