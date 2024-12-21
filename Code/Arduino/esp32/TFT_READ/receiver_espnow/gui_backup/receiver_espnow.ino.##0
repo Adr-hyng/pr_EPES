@@ -30,8 +30,28 @@ static int16_t DebugOut(char ch) { if (ch == (char)'\n') Serial.println(""); els
 // ------------------------------------------------
 // Callback Methods
 // ------------------------------------------------
-//<Button Callback !Start!>
-//<Button Callback !End!>
+// Common Button callback
+bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY)
+{
+  // Typecast the parameters to match the GUI and element types
+  gslc_tsGui*     pGui     = (gslc_tsGui*)(pvGui);
+  gslc_tsElemRef* pElemRef = (gslc_tsElemRef*)(pvElemRef);
+  gslc_tsElem*    pElem    = gslc_GetElemFromRef(pGui,pElemRef);
+
+  if ( eTouch == GSLC_TOUCH_UP_IN ) {
+    // From the element's ID we can determine which button was pressed.
+    switch (pElem->nId) {
+//<Button Enums !Start!>
+      case HeaterIndicator:
+        break;
+
+//<Button Enums !End!>
+      default:
+        break;
+    }
+  }
+  return true;
+}
 //<Checkbox Callback !Start!>
 //<Checkbox Callback !End!>
 //<Keypad Callback !Start!>

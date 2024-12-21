@@ -33,7 +33,9 @@
   #error E_PROJECT_OPTIONS tab->Graphics Library should be Adafruit_GFX
 #endif
 #include <TFT_eSPI.h>
+#include "Seven_Segment22pt7b.h"
 #include "Seven_Segment30pt7b.h"
+#include "Seven_Segment8pt7b.h"
 //<Fonts !End!>
 
 // ------------------------------------------------
@@ -41,6 +43,10 @@
 // ------------------------------------------------
 //<Resources !Start!>
 extern "C" const unsigned short DROPLET_ICON[] PROGMEM;
+extern "C" const unsigned short HEATER_GLOW[] PROGMEM;
+extern "C" const unsigned short HEATER_NORMALIZE[] PROGMEM;
+extern "C" const unsigned short TEMP_LOCK[] PROGMEM;
+extern "C" const unsigned short THERMOMETER[] PROGMEM;
 //<Resources !End!>
 
 // ------------------------------------------------
@@ -48,9 +54,10 @@ extern "C" const unsigned short DROPLET_ICON[] PROGMEM;
 // ------------------------------------------------
 //<Enum !Start!>
 enum {E_PG_MAIN};
-enum {E_ELEM_IMAGE2,E_ELEM_RINGGAUGE1,E_ELEM_TEXT1,E_ELEM_TEXT2};
+enum {ContainerCap,CurTemperature,E_ELEM_IMAGE3,E_ELEM_TEXT4
+      ,E_ELEM_TEXT5,HeaterIndicator,SelTempIMGREF,TempLock};
 // Must use separate enum for fonts with MAX_FONT at end to use gslc_FontSet.
-enum {E_SEVEN_SEGMENT30,MAX_FONT};
+enum {E_SEVEN_SEGMENT22,E_SEVEN_SEGMENT30,E_SEVEN_SEGMENT8,MAX_FONT};
 //<Enum !End!>
 
 // ------------------------------------------------
@@ -63,7 +70,7 @@ enum {E_SEVEN_SEGMENT30,MAX_FONT};
 //<ElementDefines !Start!>
 #define MAX_PAGE                1
 
-#define MAX_ELEM_PG_MAIN 4 // # Elems total on page
+#define MAX_ELEM_PG_MAIN 8 // # Elems total on page
 #define MAX_ELEM_PG_MAIN_RAM MAX_ELEM_PG_MAIN // # Elems in RAM
 //<ElementDefines !End!>
 
@@ -121,7 +128,9 @@ void InitGUIslice_gen()
   // Load Fonts
   // ------------------------------------------------
 //<Load_Fonts !Start!>
+    if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT22,GSLC_FONTREF_PTR,&Seven_Segment22pt7b,1)) { return; }
     if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT30,GSLC_FONTREF_PTR,&Seven_Segment30pt7b,1)) { return; }
+    if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT8,GSLC_FONTREF_PTR,&Seven_Segment8pt7b,1)) { return; }
 //<Load_Fonts !End!>
 
 //<InitGUI !Start!>
@@ -138,34 +147,54 @@ void InitGUIslice_gen()
   // PAGE: E_PG_MAIN
   
 
-  // Create ring gauge E_ELEM_RINGGAUGE1 
+  // Create ring gauge ContainerCap 
   static char m_sRingText1[11] = "";
-  pElemRef = gslc_ElemXRingGaugeCreate(&m_gui,E_ELEM_RINGGAUGE1,E_PG_MAIN,&m_sXRingGauge1,
-          (gslc_tsRect){10,80,220,220},
+  pElemRef = gslc_ElemXRingGaugeCreate(&m_gui,ContainerCap,E_PG_MAIN,&m_sXRingGauge1,
+          (gslc_tsRect){144,65,203,203},
           (char*)m_sRingText1,11,E_SEVEN_SEGMENT30);
   gslc_ElemXRingGaugeSetValRange(&m_gui, pElemRef, 0, 100);
-  gslc_ElemXRingGaugeSetVal(&m_gui, pElemRef, 100); // Set initial value
+  gslc_ElemXRingGaugeSetVal(&m_gui, pElemRef, 50); // Set initial value
   gslc_ElemXRingGaugeSetThickness(&m_gui,pElemRef, 20);
   gslc_ElemXRingGaugeSetColorActiveFlat(&m_gui,pElemRef, GSLC_COL_WHITE);
   gslc_ElemXRingGaugeSetColorInactive(&m_gui,pElemRef, GSLC_COL_GRAY);
   gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
   m_pElemXRingGauge1 = pElemRef;
+ 
+  // Create E_ELEM_IMAGE3 using Image 
+  pElemRef = gslc_ElemCreateImg(&m_gui,E_ELEM_IMAGE3,E_PG_MAIN,(gslc_tsRect){206,110,77,104},
+    gslc_GetImageFromProg((const unsigned char*)DROPLET_ICON,GSLC_IMGREF_FMT_BMP24));
+ 
+  // Create SelTempIMGREF using Image 
+  pElemRef = gslc_ElemCreateImg(&m_gui,SelTempIMGREF,E_PG_MAIN,(gslc_tsRect){5,6,104,308},
+    gslc_GetImageFromProg((const unsigned char*)THERMOMETER,GSLC_IMGREF_FMT_BMP24));
   
-  // Create E_ELEM_TEXT1 text label
-  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT1,E_PG_MAIN,(gslc_tsRect){80,170,63,42},
-    (char*)"100",0,E_SEVEN_SEGMENT30);
+  // Create HeaterIndicator button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,HeaterIndicator,E_PG_MAIN,(gslc_tsRect){118,262,45,45},
+          gslc_GetImageFromProg((const unsigned char*)HEATER_NORMALIZE,GSLC_IMGREF_FMT_BMP24),
+          gslc_GetImageFromProg((const unsigned char*)HEATER_GLOW,GSLC_IMGREF_FMT_BMP24),
+          &CbBtnCommon);
+  
+  // Create CurTemperature text label
+  pElemRef = gslc_ElemCreateTxt(&m_gui,CurTemperature,E_PG_MAIN,(gslc_tsRect){142,15,37,30},
+    (char*)"75",0,E_SEVEN_SEGMENT22);
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
   gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
   
-  // Create E_ELEM_TEXT2 text label
-  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT2,E_PG_MAIN,(gslc_tsRect){150,170,34,42},
-    (char*)"%",0,E_SEVEN_SEGMENT30);
+  // Create E_ELEM_TEXT4 text label
+  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT4,E_PG_MAIN,(gslc_tsRect){185,10,20,10},
+    (char*)"O",0,E_SEVEN_SEGMENT8);
+  gslc_ElemSetFillEn(&m_gui,pElemRef,false);
+  gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
+  
+  // Create E_ELEM_TEXT5 text label
+  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT5,E_PG_MAIN,(gslc_tsRect){200,15,15,30},
+    (char*)"c",0,E_SEVEN_SEGMENT22);
   gslc_ElemSetFillEn(&m_gui,pElemRef,false);
   gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
  
-  // Create E_ELEM_IMAGE2 using Image 
-  pElemRef = gslc_ElemCreateImg(&m_gui,E_ELEM_IMAGE2,E_PG_MAIN,(gslc_tsRect){100,110,37,49},
-    gslc_GetImageFromProg((const unsigned char*)DROPLET_ICON,GSLC_IMGREF_FMT_BMP24));
+  // Create TempLock using Image 
+  pElemRef = gslc_ElemCreateImg(&m_gui,TempLock,E_PG_MAIN,(gslc_tsRect){40,230,42,55},
+    gslc_GetImageFromProg((const unsigned char*)TEMP_LOCK,GSLC_IMGREF_FMT_BMP24));
 //<InitGUI !End!>
 
 //<Startup !Start!>

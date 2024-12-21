@@ -13,7 +13,7 @@
 // Headers to include
 // ------------------------------------------------
 #include "sender_espnow_GSLC.h"
-#include <set>
+
 
 // ------------------------------------------------
 // Program Globals
@@ -103,7 +103,6 @@ void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem) {
 // Common Button callback
 bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY)
 {
-  bool util_validBtnFlag = false;
   // Typecast the parameters to match the GUI and element types
   gslc_tsGui*     pGui     = (gslc_tsGui*)(pvGui);
   gslc_tsElemRef* pElemRef = (gslc_tsElemRef*)(pvElemRef);
@@ -114,19 +113,16 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
     switch (pElem->nId) {
 //<Button Enums !Start!>
       case AutoBtn:
-        util_validBtnFlag = true;
         save_to_nvs(NVS_KEY_MODE, 2); // Auto Mode
         save_to_nvs(NVS_KEY_LOCK_MODE, 1); // Traditional Mode
         Serial.print("AUTO PRESSED");
         break;
       case SafeBtn:
-        util_validBtnFlag = true;
         save_to_nvs(NVS_KEY_MODE, 1); // Safe Mode
         save_to_nvs(NVS_KEY_LOCK_MODE, 0); // Traditional Mode
         Serial.print("SAFE PRESSED");
         break;
       case TradBtn:
-        util_validBtnFlag = true;
         save_to_nvs(NVS_KEY_MODE, 0); // Traditional Mode
         Serial.print("TRADITIONAL PRESSED");
         break;
@@ -136,7 +132,7 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
       default:
         break;
     }
-    if(util_validBtnFlag) CbRetoggleBtn(pGui, pElem->nId);
+    CbRetoggleBtn(pGui, pElem->nId);
   }
   return true;
 }
