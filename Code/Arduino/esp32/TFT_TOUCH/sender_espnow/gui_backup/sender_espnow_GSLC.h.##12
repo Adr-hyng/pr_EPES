@@ -41,6 +41,7 @@
   #error E_PROJECT_OPTIONS tab->Graphics Library should be Adafruit_GFX
 #endif
 #include <TFT_eSPI.h>
+#include "Seven_Segment22pt7b.h"
 //<Fonts !End!>
 
 // ------------------------------------------------
@@ -66,7 +67,7 @@ enum {E_PG_MAIN};
 enum {AutoBtn,ChildLockIndicator,ContainerCap,E_DRAW_LINE1,E_DRAW_LINE2
       ,E_ELEM_IMAGE9,E_ELEM_TEXT2,SafeBtn,TradBtn,WaterCapGauge};
 // Must use separate enum for fonts with MAX_FONT at end to use gslc_FontSet.
-enum {E_BUILTIN15X24,E_BUILTIN5X8,MAX_FONT};
+enum {E_BUILTIN5X8,E_SEVEN_SEGMENT22,MAX_FONT};
 //<Enum !End!>
 
 // ------------------------------------------------
@@ -117,7 +118,6 @@ typedef struct struct_message {
 
 // Element References for direct access
 //<Extern_References !Start!>
-extern gslc_tsElemRef* m_pElemOutTxt3;
 extern gslc_tsElemRef* m_pElemXRingGauge1;
 //<Extern_References !End!>
 
@@ -166,8 +166,8 @@ void InitGUIslice_gen()
   // Load Fonts
   // ------------------------------------------------
 //<Load_Fonts !Start!>
-    if (!gslc_FontSet(&m_gui,E_BUILTIN15X24,GSLC_FONTREF_PTR,NULL,3)) { return; }
     if (!gslc_FontSet(&m_gui,E_BUILTIN5X8,GSLC_FONTREF_PTR,NULL,1)) { return; }
+    if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT22,GSLC_FONTREF_PTR,&Seven_Segment22pt7b,1)) { return; }
 //<Load_Fonts !End!>
 
 //<InitGUI !Start!>
@@ -183,6 +183,21 @@ void InitGUIslice_gen()
   // -----------------------------------
   // PAGE: E_PG_MAIN
   
+  
+  // Create E_ELEM_TEXT2 text label
+  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT2,E_PG_MAIN,(gslc_tsRect){90,15,24,30},
+    (char*)"%",0,E_SEVEN_SEGMENT22);
+  gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_BOT_RIGHT);
+  gslc_ElemSetFillEn(&m_gui,pElemRef,false);
+  gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
+  
+  static char TContainerCap[11] = "100";
+  // Create ContainerCap text label
+  pElemRef = gslc_ElemCreateTxt(&m_gui,ContainerCap,E_PG_MAIN,(gslc_tsRect){32,15,46,30},
+    (char*)TContainerCap,11,E_BUILTIN5X8);
+  gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_MID_LEFT);
+  gslc_ElemSetFillEn(&m_gui,pElemRef,false);
+  gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
   
   // Create AutoBtn button with image label
   pElemRef = gslc_ElemCreateBtnImg(&m_gui,AutoBtn,E_PG_MAIN,(gslc_tsRect){150,7,85,85},
@@ -204,34 +219,11 @@ void InitGUIslice_gen()
           gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
           &CbBtnCommon);
   gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
-  
-  // Create ChildLockIndicator button with image label
-  pElemRef = gslc_ElemCreateBtnImg(&m_gui,ChildLockIndicator,E_PG_MAIN,(gslc_tsRect){79,262,45,45},
-          gslc_GetImageFromProg((const unsigned char*)CHILD_LOCK_NORMALIZE,GSLC_IMGREF_FMT_BMP24),
-          gslc_GetImageFromProg((const unsigned char*)CHILD_LOCK_GLOW,GSLC_IMGREF_FMT_BMP24),
-          &CbBtnCommon);
-  gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
-  
-  // Create E_ELEM_TEXT2 text label
-  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT2,E_PG_MAIN,(gslc_tsRect){86,15,18,24},
-    (char*)"%",0,E_BUILTIN15X24);
-  gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_BOT_RIGHT);
-  gslc_ElemSetFillEn(&m_gui,pElemRef,false);
-  gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
-  
-  // Create ContainerCap runtime modifiable text
-  static char m_sDisplayText3[4] = "100";
-  pElemRef = gslc_ElemCreateTxt(&m_gui,ContainerCap,E_PG_MAIN,(gslc_tsRect){29,15,54,24},
-    (char*)m_sDisplayText3,4,E_BUILTIN15X24);
-  gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_MID_RIGHT);
-  gslc_ElemSetFillEn(&m_gui,pElemRef,false);
-  gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
-  m_pElemOutTxt3 = pElemRef;
 
   // Create ring gauge WaterCapGauge 
   static char m_sRingText1[11] = "";
   pElemRef = gslc_ElemXRingGaugeCreate(&m_gui,WaterCapGauge,E_PG_MAIN,&m_sXRingGauge1,
-          (gslc_tsRect){-121,65,203,203},
+          (gslc_tsRect){-101,65,203,203},
           (char*)m_sRingText1,11,E_BUILTIN5X8);
   gslc_ElemXRingGaugeSetValRange(&m_gui, pElemRef, 0, 100);
   gslc_ElemXRingGaugeSetVal(&m_gui, pElemRef, 2); // Set initial value
@@ -241,8 +233,15 @@ void InitGUIslice_gen()
   m_pElemXRingGauge1 = pElemRef;
  
   // Create E_ELEM_IMAGE9 using Image 
-  pElemRef = gslc_ElemCreateImg(&m_gui,E_ELEM_IMAGE9,E_PG_MAIN,(gslc_tsRect){-58,110,76,101},
+  pElemRef = gslc_ElemCreateImg(&m_gui,E_ELEM_IMAGE9,E_PG_MAIN,(gslc_tsRect){-38,110,76,101},
     gslc_GetImageFromProg((const unsigned char*)DROPLET_ICON,GSLC_IMGREF_FMT_BMP24));
+  
+  // Create ChildLockIndicator button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,ChildLockIndicator,E_PG_MAIN,(gslc_tsRect){79,262,45,45},
+          gslc_GetImageFromProg((const unsigned char*)CHILD_LOCK_NORMALIZE,GSLC_IMGREF_FMT_BMP24),
+          gslc_GetImageFromProg((const unsigned char*)CHILD_LOCK_GLOW,GSLC_IMGREF_FMT_BMP24),
+          &CbBtnCommon);
+  gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
 
   // Create E_DRAW_LINE1 line 
   pElemRef = gslc_ElemCreateLine(&m_gui,E_DRAW_LINE1,E_PG_MAIN,193,92,193,116);

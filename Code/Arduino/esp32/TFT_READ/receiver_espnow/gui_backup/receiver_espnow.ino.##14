@@ -29,14 +29,10 @@ typedef struct struct_message {
   short SelTemp_MRange;
 } struct_message;
 struct_message myData;
-bool redrawRequired = false;
 // ------------------------------------------------
 
 // Save some element references for direct access
 //<Save_References !Start!>
-gslc_tsElemRef* m_pElemOutCurTemp = NULL;
-gslc_tsElemRef* m_pElemOutSelTemp = NULL;
-gslc_tsElemRef* m_pElemOutThermometerIMG= NULL;
 gslc_tsElemRef* m_pElemXRingGauge1= NULL;
 //<Save_References !End!>
 
@@ -68,15 +64,6 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   Serial.println();
 
   gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
-  static char TCurTemp[8] = ""; // Ensure TCurTemp is properly declared
-  snprintf(TCurTemp, sizeof(TCurTemp), "%d", myData.CurTemperature);
-  if (m_pElemOutCurTemp != NULL) {
-    gslc_ElemSetTxtStr(&m_gui, m_pElemOutCurTemp, TCurTemp);
-    // gslc_ElemSetRedraw(&m_gui, m_pElemOutCurTemp, GSLC_REDRAW_FULL);
-  } else {
-      Serial.println("Error: m_pElemOutCurTemp is NULL");
-  }
-  redrawRequired = true;
 }
 // Common Button callback
 bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY)
@@ -152,10 +139,6 @@ void loop()
 
   // ------------------------------------------------
   // Update GUI Elements
-  if (redrawRequired) {
-    gslc_ElemSetRedraw(&m_gui, m_pElemOutCurTemp, GSLC_REDRAW_FOCUS);
-    redrawRequired = false; // Reset flag after redraw
-  }
   // ------------------------------------------------
   
   //TODO - Add update code for any text, gauges, or sliders
@@ -164,5 +147,6 @@ void loop()
   // Periodically call GUIslice update function
   // ------------------------------------------------
   gslc_Update(&m_gui);
+    
 }
 

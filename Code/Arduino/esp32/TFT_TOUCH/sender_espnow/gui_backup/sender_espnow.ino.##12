@@ -27,7 +27,6 @@ struct_message myData;
 
 // Save some element references for direct access
 //<Save_References !Start!>
-gslc_tsElemRef* m_pElemOutTxt3    = NULL;
 gslc_tsElemRef* m_pElemXRingGauge1= NULL;
 //<Save_References !End!>
 
@@ -45,21 +44,25 @@ void sendData()
   myData.CLstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
   myData.Hstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
   myData.TLstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
-  myData.CurTemperature = random(25, 100);
-  myData.SelTemp_MRange = random(50, 75);
+  myData.CurTemperature = 26;
+  myData.SelTemp_MRange = 75;
 
-  m_pElemOutTxt3 = gslc_PageFindElemById(&m_gui, gslc_GetPageCur(&m_gui), ContainerCap);
+  m_pElemXRingGauge1 = gslc_PageFindElemById(&m_gui, gslc_GetPageCur(&m_gui), ContainerCap);
   // Update the GUI element text
-  static char TContainerCap[4] = ""; // Ensure TContainerCap is properly declared
+  static char TContainerCap[11] = "5"; // Ensure TContainerCap is properly declared
   // Generate a random number and convert it to a string
-  std::string randomStr = std::to_string(random(40, 100)); 
-  strncpy(TContainerCap, randomStr.c_str(), sizeof(TContainerCap) - 1); // Copy the string to TContainerCap
-  TContainerCap[sizeof(TContainerCap) - 1] = '\0'; // Null-terminate to prevent overflow
+  // std::string randomStr = std::to_string(random(1, 50)); 
+  // strncpy(TContainerCap, randomStr.c_str(), sizeof(TContainerCap) - 1); // Copy the string to TContainerCap
+  // TContainerCap[sizeof(TContainerCap) - 1] = '\0'; // Null-terminate to prevent overflow
 
   // Update the GUI element
-  myData.ContainerCap = std::stoi(TContainerCap);
-  gslc_ElemSetTxtStr(&m_gui, m_pElemOutTxt3, TContainerCap);
-  gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
+  // Update the text
+  gslc_ElemSetTxtStr(&m_gui, m_pElemXRingGauge1, TContainerCap);
+  // Mark the element for redraw
+  gslc_ElemSetRedraw(&m_gui, m_pElemXRingGauge1, GSLC_REDRAW_FULL);
+  gslc_Update(&m_gui);
+  Serial.println(TContainerCap);
+
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&myData, sizeof(myData));
 
@@ -174,12 +177,13 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
       case AutoBtn:
         util_validBtnFlag = true;
         save_to_nvs(NVS_KEY_MODE, 2); // Auto Mode
+        save_to_nvs(NVS_KEY_LOCK_MODE, 1); // Traditional Mode
         Serial.print("AUTO PRESSED");
         break;
       case SafeBtn:
         util_validBtnFlag = true;
         save_to_nvs(NVS_KEY_MODE, 1); // Safe Mode
-        // save_to_nvs(NVS_KEY_LOCK_MODE, 0); // Traditional Mode
+        save_to_nvs(NVS_KEY_LOCK_MODE, 0); // Traditional Mode
         Serial.print("SAFE PRESSED");
         break;
       case TradBtn:
@@ -216,6 +220,7 @@ void setup()
 {
   // ------------------------------------------------
   // Initialize
+  myData.ContainerCap = 0;
   // ------------------------------------------------
   Serial.begin(9600);
   // Wait for USB Serial 
@@ -260,6 +265,8 @@ void loop()
 
   // ------------------------------------------------
   // Update GUI Elements
+  // int containerCapValue = atoi(strContainerCap);
+  // gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, containerCapValue);
   // ------------------------------------------------
   
   //TODO - Add update code for any text, gauges, or sliders
