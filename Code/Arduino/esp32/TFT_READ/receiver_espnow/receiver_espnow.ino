@@ -13,10 +13,22 @@
 // Headers to include
 // ------------------------------------------------
 #include "receiver_espnow_GSLC.h"
-
+#include <esp_now.h>
+#include <WiFi.h>
 
 // ------------------------------------------------
 // Program Globals
+// Must match the sender structure
+typedef struct struct_message {
+  short ContainerCap;
+  short Mode;
+  short CLstate; // child lock
+  short Hstate; // heat lock
+  short TLstate; // temp lock
+  short CurTemperature;
+  short SelTemp_MRange;
+} struct_message;
+struct_message myData;
 // ------------------------------------------------
 
 // Save some element references for direct access
@@ -30,6 +42,27 @@ static int16_t DebugOut(char ch) { if (ch == (char)'\n') Serial.println(""); els
 // ------------------------------------------------
 // Callback Methods
 // ------------------------------------------------
+// callback function that will be executed when data is received
+void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+  memcpy(&myData, incomingData, sizeof(myData));
+  Serial.print("Bytes received: ");
+  Serial.println(len);
+  Serial.print("Capacity: ");
+  Serial.println(myData.ContainerCap);
+  Serial.print("Mode: ");
+  Serial.println(myData.Mode);
+  Serial.print("Child-Lock: ");
+  Serial.println(myData.CLstate);
+  Serial.print("Heater: ");
+  Serial.println(myData.Hstate);
+  Serial.print("Temperature Lock: ");
+  Serial.println(myData.TLstate);
+  Serial.print("Current Temp.: ");
+  Serial.println(myData.CurTemperature);
+  Serial.print("Selected Max Temp: ");
+  Serial.println(myData.SelTemp_MRange);
+  Serial.println();
+}
 // Common Button callback
 bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY)
 {
@@ -82,6 +115,18 @@ void setup()
   // ------------------------------------------------
   InitGUIslice_gen();
 
+  // Set device as a Wi-Fi Station
+  WiFi.mode(WIFI_STA);
+
+  // Init ESP-NOW
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+  
+  // Once ESPNow is successfully Init, we will register for recv CB to
+  // get recv packer info
+  esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
 }
 
 // -----------------------------------

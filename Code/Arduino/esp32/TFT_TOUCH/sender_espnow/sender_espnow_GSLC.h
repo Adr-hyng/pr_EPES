@@ -159,6 +159,8 @@ static int16_t DebugOut(char ch);
 // ------------------------------------------------
 // Callback Methods
 // ------------------------------------------------
+void execEveryMillis(unsigned long interval, void (*callback)());
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status);
 void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigned short* newBitmap);
 void save_to_nvs(const char* key, int value);
 int load_from_nvs(const char* key, int default_value);

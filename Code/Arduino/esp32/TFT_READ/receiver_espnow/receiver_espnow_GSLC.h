@@ -108,6 +108,7 @@ static int16_t DebugOut(char ch);
 // ------------------------------------------------
 // Callback Methods
 // ------------------------------------------------
+void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len);
 bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY);
 bool CbCheckbox(void* pvGui, void* pvElemRef, int16_t nSelId, bool bState);
 bool CbDrawScanner(void* pvGui,void* pvElemRef,gslc_teRedrawType eRedraw);

@@ -14,9 +14,24 @@
 // ------------------------------------------------
 #include "sender_espnow_GSLC.h"
 #include <set>
+#include <esp_now.h>
+#include <WiFi.h>
 
 // ------------------------------------------------
 // Program Globals
+uint8_t broadcastAddress[] = {0xb0, 0xb2, 0x1c, 0xa6, 0x45, 0xa0};
+esp_now_peer_info_t peerInfo;
+// Must match the receiver structure
+typedef struct struct_message {
+  short ContainerCap;
+  short Mode;
+  short CLstate; // child lock
+  short Hstate; // heat lock
+  short TLstate; // temp lock
+  short CurTemperature;
+  short SelTemp_MRange;
+} struct_message;
+struct_message myData;
 // ------------------------------------------------
 
 // Save some element references for direct access
@@ -30,6 +45,40 @@ static int16_t DebugOut(char ch) { if (ch == (char)'\n') Serial.println(""); els
 // ------------------------------------------------
 // Callback Methods
 // ------------------------------------------------
+void sendData() {
+  // Set values to send
+  myData.ContainerCap = 70;
+  myData.Mode = load_from_nvs(NVS_KEY_MODE, 0);
+  myData.CLstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
+  myData.Hstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
+  myData.TLstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
+  myData.CurTemperature = 26;
+  myData.SelTemp_MRange = 75;
+
+  // Send message via ESP-NOW
+  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&myData, sizeof(myData));
+
+  if (result == ESP_OK) {
+    Serial.println("Sent with success");
+  } else {
+    Serial.println("Error sending the data");
+  }
+}
+
+void execEveryMillis(unsigned long interval, void (*callback)()) {
+  static unsigned long lastExecutionTime = 0;
+  unsigned long currentMillis = millis();
+  
+  if (currentMillis - lastExecutionTime >= interval) {
+    lastExecutionTime = currentMillis;
+    callback();
+  }
+}
+
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  Serial.print("\r\nLast Packet Send Status:\t");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+}
 void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigned short* newBitmap) {
     if (pElemRef == nullptr) {
         return; // Element reference is invalid
@@ -171,6 +220,28 @@ void setup()
   // ------------------------------------------------
   InitGUIslice_gen();
 
+  WiFi.mode(WIFI_STA);
+
+  // Init ESP-NOW
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+
+  // Once ESPNow is successfully Init, we will register for Send CB to
+  // get the status of Trasnmitted packet
+  esp_now_register_send_cb(OnDataSent);
+  
+  // Register peer
+  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;
+  
+  // Add peer        
+  if (esp_now_add_peer(&peerInfo) != ESP_OK){
+    Serial.println("Failed to add peer");
+    return;
+  }
 }
 
 // -----------------------------------
@@ -184,7 +255,9 @@ void loop()
   // ------------------------------------------------
   
   //TODO - Add update code for any text, gauges, or sliders
-  
+  // Execute sendData() every 5000 milliseconds (5 seconds)
+  execEveryMillis(5000, sendData);
+
   // ------------------------------------------------
   // Periodically call GUIslice update function
   // ------------------------------------------------
