@@ -68,7 +68,7 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   Serial.println();
 
   gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
-  static char TCurTemp[8] = ""; // Ensure TCurTemp is properly declared
+  static char TCurTemp[4] = ""; // Ensure TCurTemp is properly declared
   snprintf(TCurTemp, sizeof(TCurTemp), "%d", myData.CurTemperature);
   if (m_pElemOutCurTemp != NULL) {
     gslc_ElemSetTxtStr(&m_gui, m_pElemOutCurTemp, TCurTemp);
