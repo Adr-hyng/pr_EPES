@@ -20,6 +20,8 @@
 #include <DallasTemperature.h>
 
 #include "HX711.h"
+#include <vector>
+#include <math.h>
 
 // ------------------------------------------------
 // Program Globals
@@ -52,6 +54,7 @@ const int joystick_y_pin = 34;
 const int LOADCELL_DOUT_PIN = 16;
 const int LOADCELL_SCK_PIN = 33;
 HX711 scale;
+float calibrationFactor = -3084.7;
 // ------------------------------------------------
 
 // Save some element references for direct access
@@ -68,6 +71,71 @@ static int16_t DebugOut(char ch) { if (ch == (char)'\n') Serial.println(""); els
 // ------------------------------------------------
 // Callback Methods
 // ------------------------------------------------
+void initializeScale() {
+  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+  scale.set_scale(calibrationFactor);
+  scale.tare();
+}
+// Function to handle weight reading, stabilization, and lifting
+void handleWeightMeasurement(float& targetWeight, bool& isStabilized, float weightReduction = 0.05, float stabilizationThreshold = 0.3, int maxReadings = 20) {
+  static std::vector<float> weightReadings;
+  
+  if (scale.is_ready()) {
+    float weight = scale.get_units(10); // Average of 10 readings
+    weightReadings.push_back(weight);
+
+    // Maintain the maximum number of readings
+    if (weightReadings.size() > maxReadings) {
+      weightReadings.erase(weightReadings.begin());
+    }
+
+    if (weightReadings.size() == maxReadings) {
+      // Calculate mean and standard deviation
+      float mean = calculateMean(weightReadings);
+      float stddev = calculateStdDev(weightReadings, mean);
+
+      if (!isStabilized && stddev < stabilizationThreshold) {
+        isStabilized = true;
+        Serial.println("Stabilization complete.");
+      } else if (isStabilized && stddev >= stabilizationThreshold) {
+        targetWeight -= weightReduction; // Adjust target weight
+        Serial.print("Lifting... Target Weight: ");
+        Serial.print(targetWeight, 2);
+        Serial.println(" g");
+      }
+
+      // Display results
+      Serial.print("Current Weight: ");
+      Serial.print(weight, 2);
+      Serial.println(" g");
+      Serial.print("Mean: ");
+      Serial.print(mean, 2);
+      Serial.println(" g");
+      Serial.print("Standard Deviation: ");
+      Serial.print(stddev, 2);
+      Serial.println(" g");
+    }
+  } else {
+    Serial.println("HX711 not found. Check connections.");
+  }
+}
+
+// Helper functions
+float calculateMean(const std::vector<float>& readings) {
+  float sum = 0.0;
+  for (float value : readings) {
+    sum += value;
+  }
+  return sum / readings.size();
+}
+
+float calculateStdDev(const std::vector<float>& readings, float mean) {
+  float sumSqDiff = 0.0;
+  for (float value : readings) {
+    sumSqDiff += pow(value - mean, 2);
+  }
+  return sqrt(sumSqDiff / readings.size());
+}
 void sendData()
 {
   // Set values to send
@@ -88,14 +156,12 @@ void sendData()
   myData.isPushed = y_volt <= 1.3;
 
   Serial.println(y_volt);
-  
-  if (scale.is_ready()) {
-    // myData.ContainerCap = scale.get_units(10);
-    Serial.println(scale.read_average());
-  } else {
-    Serial.println("HX711 not found.");
-  }
 
+  static float currentWaterCapacity = 100.0;
+  static bool isStabilized = false;
+  handleWeightMeasurement(currentWaterCapacity, isStabilized);
+  myData.ContainerCap = currentWaterCapacity;
+  
   static char TCurTemp[4] = ""; // Ensure TCurTemp is properly declared
   snprintf(TCurTemp, sizeof(TCurTemp), "%d", myData.CurTemperature);
   if (m_pElemOutCurTemp != NULL) {
@@ -204,9 +270,7 @@ void setup()
   // ------------------------------------------------
   Serial.begin(115200);
   sensors.begin();
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  // scale.set_scale(-8925/100);
-  // scale.tare(); 
+  initializeScale();
   // Wait for USB Serial 
   //delay(1000);  // NOTE: Some devices require a delay after Serial.begin() before serial port can be used
 
