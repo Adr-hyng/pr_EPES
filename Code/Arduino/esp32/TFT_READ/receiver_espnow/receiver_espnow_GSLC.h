@@ -181,7 +181,7 @@ void InitGUIslice_gen()
   gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
   
   // Create CurTemperature runtime modifiable text
-  static char m_sDisplayText3[4] = "75";
+  static char m_sDisplayText3[4] = "5";
   pElemRef = gslc_ElemCreateTxt(&m_gui,CurTemperature,E_PG_MAIN,(gslc_tsRect){125,15,54,24},
     (char*)m_sDisplayText3,4,E_BUILTIN15X24);
   gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_MID_RIGHT);

@@ -16,6 +16,7 @@ Tools being used are:
 	TD_LED -> ESP32 3V3
 	TD_MISO	-> ESP32 D19
 	T_CLK -> ESP32 D18
+
 	T_CS -> ESP32 D21
 	T_DIN -> ESP32 D23
 	T_DO -> ESP32 D19
@@ -25,9 +26,11 @@ Tools being used are:
 	> Uncomment "#include "../configs/esp-tftespi-default-xpt2046_int.h"" for touchscreen, and "#include "../configs/esp-tftespi-default-notouch.h"" for display only. Select only one or just copy the content.
 	> Copy the "esp-tftespi_default_xpt2046_int.h" content (Touchscreen) or "esp-tftespi-default-notouch.h" (Display only) depending on the driver.
 	> Use Image Extern for Flash with C-arrays inside C-files. Better if use SD Card than Flash Memory.
+	> Remove pin D2 for uploading
 	
 2. fastdup
 
 
 Troubleshooting:
 - If it goes white, and doesn't read touchscreen but displays check wires from touchscreen.
+- Change TFT_eSPI (Setup42) config's SPI Frequency, ESP32-READ is 40000000, and 40 MHz in Arduino IDE. While the TOUCH is 80000000, and 80MHz.

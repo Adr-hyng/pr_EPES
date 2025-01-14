@@ -45,6 +45,9 @@
 
 // ------------------------------------------------
 // Defines for resources
+// #define TFT_MIRROR_X // Comment this if enabled
+// #define TFT_MIRROR_Y // Comment this if enabled
+
 // ------------------------------------------------
 //<Resources !Start!>
 extern "C" const unsigned short AUTO_BUTTON[] PROGMEM;
@@ -105,14 +108,15 @@ gslc_tsXRingGauge               m_sXRingGauge1;
 bool g_ButtonFlags[3] = {false, false, true}; // Glowing buttons
 // Must match the receiver structure
 typedef struct struct_message {
-  short ContainerCap;
-  short Mode;
+  short ContainerCap; // water jug capacity
+  short Mode; // 0-2
   short CLstate; // child lock
-  short Hstate; // heat lock
+  short Hstate; // heater state
   short TLstate; // temp lock
-  short CurTemperature;
-  short SelTemp_MRange;
-} struct_message;
+  short CurTemperature; // current temperature
+  short SelTemp_MRange; // selected temperature range
+  bool isPushed; // analog joystick is pushed
+} struct_message; 
 // ------------------------------------------------
 
 // Element References for direct access
@@ -159,11 +163,11 @@ void InitGUIslice_gen()
   ESP_ERROR_CHECK(ret);
 
   // Load the last mode from NVS
-  int last_mode = load_from_nvs(NVS_KEY_MODE, 0);
+  int last_mode = load_from_nvs(NVS_KEY_MODE, 1);
   int last_lock_state = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
 
   // ------------------------------------------------
-  // Load Fonts
+  // Load Fonts1
   // ------------------------------------------------
 //<Load_Fonts !Start!>
     if (!gslc_FontSet(&m_gui,E_BUILTIN15X24,GSLC_FONTREF_PTR,NULL,3)) { return; }
@@ -278,6 +282,7 @@ void InitGUIslice_gen()
     gslc_ElemSetGlow(&m_gui, pElemRef2, true);
   }
   gslc_GuiRotate(&m_gui, 0);
+
 //<Startup !End!>
 
 }

@@ -17,12 +17,16 @@
 #include <string>
 #include <esp_now.h>
 #include <WiFi.h>
+#include <TFT_eSPI.h>
+TFT_eSPI tft = TFT_eSPI();
 
 // ------------------------------------------------
 // Program Globals
-uint8_t broadcastAddress[] = {0xb0, 0xb2, 0x1c, 0xa6, 0x45, 0xa0};
+uint8_t broadcastAddress[] = {0xb0, 0xb2, 0x1c, 0xa6, 0x45, 0xa0}; // Old ESP
 esp_now_peer_info_t peerInfo;
 struct_message myData;
+
+const int buzzerPin = 5;
 // ------------------------------------------------
 
 // Save some element references for direct access
@@ -40,26 +44,22 @@ static int16_t DebugOut(char ch) { if (ch == (char)'\n') Serial.println(""); els
 void sendData()
 {
   // Set values to send
-  myData.ContainerCap = random(1, 100);
+  myData.ContainerCap = myData.ContainerCap;
   myData.Mode = load_from_nvs(NVS_KEY_MODE, 0);
   myData.CLstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
-  myData.Hstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
-  myData.TLstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
-  myData.CurTemperature = random(25, 100);
-  myData.SelTemp_MRange = random(50, 75);
 
   m_pElemOutTxt3 = gslc_PageFindElemById(&m_gui, gslc_GetPageCur(&m_gui), ContainerCap);
   // Update the GUI element text
-  static char TContainerCap[4] = ""; // Ensure TContainerCap is properly declared
+  // static char TContainerCap[4] = ""; // Ensure TContainerCap is properly declared
   // Generate a random number and convert it to a string
-  std::string randomStr = std::to_string(random(40, 100)); 
-  strncpy(TContainerCap, randomStr.c_str(), sizeof(TContainerCap) - 1); // Copy the string to TContainerCap
-  TContainerCap[sizeof(TContainerCap) - 1] = '\0'; // Null-terminate to prevent overflow
+  // std::string randomStr = std::to_string(random(40, 100)); 
+  // strncpy(TContainerCap, randomStr.c_str(), sizeof(TContainerCap) - 1); // Copy the string to TContainerCap
+  // TContainerCap[sizeof(TContainerCap) - 1] = '\0'; // Null-terminate to prevent overflow
 
   // Update the GUI element
-  myData.ContainerCap = std::stoi(TContainerCap);
-  gslc_ElemSetTxtStr(&m_gui, m_pElemOutTxt3, TContainerCap);
-  gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
+  // myData.ContainerCap = std::stoi(TContainerCap);
+  // gslc_ElemSetTxtStr(&m_gui, m_pElemOutTxt3, TContainerCap);
+  // gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&myData, sizeof(myData));
 
@@ -69,7 +69,6 @@ void sendData()
     Serial.println("Error sending the data");
   }
 }
-
 void execEveryMillis(unsigned long interval, void (*callback)())
 {
   static unsigned long lastExecutionTime = 0;
@@ -80,7 +79,33 @@ void execEveryMillis(unsigned long interval, void (*callback)())
     callback();
   }
 }
+// callback function that will be executed when data is received
+void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+  memcpy(&myData, incomingData, sizeof(myData));
+  Serial.print("Bytes received: ");
+  Serial.println(len);
+  Serial.print("Capacity: ");
+  Serial.println(myData.ContainerCap);
+  Serial.print("Mode: ");
+  Serial.println(myData.Mode);
+  Serial.print("Child-Lock: ");
+  Serial.println(myData.CLstate);
+  Serial.print("Heater: ");
+  Serial.println(myData.Hstate);
+  Serial.print("Temperature Lock: ");
+  Serial.println(myData.TLstate);
+  Serial.print("Current Temp.: ");
+  Serial.println(myData.CurTemperature);
+  Serial.print("Selected Max Temp: ");
+  Serial.println(myData.SelTemp_MRange);
+  Serial.println();
 
+  static char TContainerCap[4] = ""; // Ensure TContainerCap is properly declared
+  snprintf(TContainerCap, sizeof(TContainerCap), "%d", myData.ContainerCap);
+  // Update the GUI element
+  gslc_ElemSetTxtStr(&m_gui, m_pElemOutTxt3, TContainerCap);
+  gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
+}
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 {
   Serial.print("\r\nLast Packet Send Status:\t");
@@ -157,6 +182,11 @@ void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem)
         i++;
     }
 }
+void beepBuzzer(unsigned long duration = 50) {
+  digitalWrite(buzzerPin, HIGH);
+  delay(duration);
+  digitalWrite(buzzerPin, LOW);
+}
 
 // Common Button callback
 bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY)
@@ -174,6 +204,7 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
       case AutoBtn:
         util_validBtnFlag = true;
         save_to_nvs(NVS_KEY_MODE, 2); // Auto Mode
+        // beepBuzzer(50);
         Serial.print("AUTO PRESSED");
         break;
       case SafeBtn:
@@ -193,6 +224,7 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
       default:
         break;
     }
+    // sendData();
     if(util_validBtnFlag) CbRetoggleBtn(pGui, pElem->nId);
   }
   return true;
@@ -220,6 +252,8 @@ void setup()
   Serial.begin(9600);
   // Wait for USB Serial 
   //delay(1000);  // NOTE: Some devices require a delay after Serial.begin() before serial port can be used
+  pinMode(buzzerPin, OUTPUT); // Set the buzzer pin as output
+  digitalWrite(buzzerPin, LOW); // Ensure the buzzer is off initially
 
   gslc_InitDebug(&DebugOut);
 
@@ -239,6 +273,10 @@ void setup()
   // Once ESPNow is successfully Init, we will register for Send CB to
   // get the status of Trasnmitted packet
   esp_now_register_send_cb(OnDataSent);
+
+  // Once ESPNow is successfully Init, we will register for recv CB to
+  // get recv packer info
+  esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
   
   // Register peer
   memcpy(peerInfo.peer_addr, broadcastAddress, 6);
@@ -264,7 +302,7 @@ void loop()
   
   //TODO - Add update code for any text, gauges, or sliders
   // Execute sendData() every 5000 milliseconds (5 seconds)
-  execEveryMillis(5000, sendData);
+  // execEveryMillis(1000, sendData);
 
   // ------------------------------------------------
   // Periodically call GUIslice update function
