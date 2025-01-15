@@ -46,20 +46,20 @@ def help():
     print('python classify.py <path_to_model.eim> <Camera port ID, only required when more than 1 camera is present>')
 
 def main(argv):
-    try:
-        opts, args = getopt.getopt(argv, "h", ["--help"])
-    except getopt.GetoptError:
-        help()
-        sys.exit(2)
+#    try:
+#        opts, args = getopt.getopt(argv, "h", ["--help"])
+#    except getopt.GetoptError:
+#        help()
+#        sys.exit(2)
+#
+#    for opt, arg in opts:
+#        if opt in ('-h', '--help'):
+#            help()
+#            sys.exit()
 
-    for opt, arg in opts:
-        if opt in ('-h', '--help'):
-            help()
-            sys.exit()
-
-    if len(args) == 0:
-        help()
-        sys.exit(2)
+#    if len(args) == 0:
+#        help()
+#        sys.exit(2)
 
     model = "modelfile.eim"
 
@@ -74,15 +74,10 @@ def main(argv):
             # model_info = runner.init(debug=True) # to get debug print out
             print('Loaded runner for "' + model_info['project']['owner'] + ' / ' + model_info['project']['name'] + '"')
             labels = model_info['model_parameters']['labels']
-            if len(args)>= 2:
-                videoCaptureDeviceId = int(args[1])
-            else:
-                port_ids = get_webcams()
-                if len(port_ids) == 0:
-                    raise Exception('Cannot find any webcams')
-                if len(args)<= 1 and len(port_ids)> 1:
-                    raise Exception("Multiple cameras found. Add the camera port ID as a second argument to use to this script")
-                videoCaptureDeviceId = int(port_ids[0])
+            port_ids = get_webcams()
+            if len(port_ids) == 0:
+                raise Exception('Cannot find any webcams')
+            videoCaptureDeviceId = int(port_ids[0])
 
             camera = cv2.VideoCapture(videoCaptureDeviceId)
             ret = camera.read()[0]
