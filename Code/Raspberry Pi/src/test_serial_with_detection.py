@@ -36,8 +36,8 @@ GPIO.output(HotWater, GPIO.LOW);
 
 detection_timestamps = []  # List to store timestamps of detections
 min_detections = 1  # 20 = 500
-frequency_millis = 50 # Number of milliseconds to detect it is consistent container.
-box_rect_size = 20
+frequency_millis = 100 # Number of milliseconds to detect it is consistent container.
+box_rect_size = 18
 
 # Shared flag for joystick status
 # Global variables for parsed data
