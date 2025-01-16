@@ -37,7 +37,7 @@ GPIO.output(HotWater, GPIO.LOW);
 detection_timestamps = []  # List to store timestamps of detections
 min_detections = 1  # 20 = 500
 frequency_millis = 50 # Number of milliseconds to detect it is consistent container.
-dispense_state = 0
+box_rect_size = 20
 
 # Shared flag for joystick status
 # Global variables for parsed data
@@ -111,31 +111,29 @@ def remove_old_detections(current_time):
     detection_timestamps = [timestamp for timestamp in detection_timestamps if timestamp >= two_seconds_ago]
 
 is_pouring = False
+def run_pump_thread(state):
+    """
+    Directly control the pump state with safe GPIO handling.
+    """
+    global is_pouring
+    if state and not is_pouring:
+        # Turn on the pump
+        print("Turning pump ON")
+        GPIO.output(WarmWater, GPIO.HIGH)
+        is_pouring = True
+    elif not state and is_pouring:
+        # Turn off the pump
+        print("Turning pump OFF")
+        GPIO.output(WarmWater, GPIO.LOW)
+        is_pouring = False
 
 def turn_pump(state):
+    """
+    Trigger the pump state change safely.
+    """
     global is_pouring
-    pass
-#    if state:
-#        if not is_pouring:
-#            GPIO.output(WarmWater, GPIO.HIGH)
-#        is_pouring = True
-#        
-#    else:
-#        if is_pouring:
-#            GPIO.output(WarmWater, GPIO.LOW)
-#        is_pouring = False
-#    if state == True:
-#        if is_pouring == True:
-#            return
-#        else:
-#            GPIO.output(WarmWater, GPIO.HIGH)
-#            is_pouring = True 
-#    else:
-#        if is_pouring == False:
-#            return
-#        else:
-#            GPIO.output(WarmWater, GPIO.LOW)
-#            is_pouring = False
+    if (state and not is_pouring) or (not state and is_pouring):
+        run_pump_thread(state)
 
 def check_for_consistent_detections():
     """Check if there are enough recent detections to trigger an action."""
@@ -156,8 +154,6 @@ def check_for_consistent_detections():
     else:
         GPIO.output(WarmWater, GPIO.LOW);
         turn_pump(False)
-
-box_rect_size = 20
 
 def main():
     model = "modelfile.eim"
@@ -235,10 +231,9 @@ def main():
                             bb_center_y = closest_bb['y'] + closest_bb['height'] // 2
                             closest_distance = math.floor(math.sqrt((bb_center_x - target[0]) ** 2 + (bb_center_y - target[1]) ** 2))
                         
-                            if closest_distance < 15:
+                            if closest_distance < box_rect_size:
                                 detection_timestamps.append(current_time)
-                                img = cv2.rectangle(img, (closest_bb['x'], closest_bb['y']), (closest_bb['x'] + closest_bb['width'], closest_bb['y'] + closest_bb['height']), (255, 0, 0), 1)
-                                cv2.rectangle(img, (target[0], target[1]), (target[0] + box_rect_size, target[1] + box_rect_size), color, 1)
+                                img = cv2.rectangle(img, (closest_bb['x'], closest_bb['y']), (closest_bb['x'] + closest_bb['width'], closest_bb['y'] + closest_bb['height']), color, 1)
                             
                     next_frame = now() + 5
                     cv2.rectangle(img, (target[0] - box_rect_size // 2, target[1] - box_rect_size // 2), (target[0] + box_rect_size, target[1] + box_rect_size), (0, 255, 0), 2)
@@ -277,10 +272,9 @@ def main():
                             bb_center_y = closest_bb['y'] + closest_bb['height'] // 2
                             closest_distance = math.floor(math.sqrt((bb_center_x - target[0]) ** 2 + (bb_center_y - target[1]) ** 2))
                         
-                            if closest_distance < 15:
+                            if closest_distance < box_rect_size:
                                 detection_timestamps.append(current_time)
                                 img = cv2.rectangle(img, (closest_bb['x'], closest_bb['y']), (closest_bb['x'] + closest_bb['width'], closest_bb['y'] + closest_bb['height']), color, 1)
-                                #cv2.rectangle(img, (target[0], target[1]), (target[0] + box_rect_size, target[1] + box_rect_size), color, 1)
                             
                     next_frame = now() + 5
                     cv2.rectangle(img, (target[0] - box_rect_size // 2, target[1] - box_rect_size // 2), (target[0] + box_rect_size, target[1] + box_rect_size), (0, 255, 0), 2)
