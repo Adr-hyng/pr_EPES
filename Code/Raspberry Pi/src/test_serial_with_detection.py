@@ -35,8 +35,8 @@ GPIO.output(WarmWater, GPIO.LOW);
 GPIO.output(HotWater, GPIO.LOW);
 
 detection_timestamps = []  # List to store timestamps of detections
-min_detections = 10  # 20 = 500
-frequency_millis = 500 # Number of milliseconds to detect it is consistent container.
+min_detections = 1  # 20 = 500
+frequency_millis = 50 # Number of milliseconds to detect it is consistent container.
 dispense_state = 0
 
 # Shared flag for joystick status
@@ -47,22 +47,6 @@ CurTemperature = 0
 IsPushed = False
 
 show_camera = True
-
-def remove_old_detections(current_time):
-    """Remove detections older than 2 seconds."""
-    global detection_timestamps
-    two_seconds_ago = current_time - frequency_millis  # Convert 2 seconds to milliseconds
-    detection_timestamps = [timestamp for timestamp in detection_timestamps if timestamp >= two_seconds_ago]
-
-def check_for_consistent_detections():
-    """Check if there are enough recent detections to trigger an action."""
-    global detection_timestamps
-    if len(detection_timestamps) >= min_detections:
-        print("Consistent container detections detected!")
-        detection_timestamps.clear()
-    else:
-        GPIO.output(WarmWater, GPIO.LOW);
-    
 
 def now():
     return round(time.time() * 1000)
@@ -126,6 +110,33 @@ def remove_old_detections(current_time):
     two_seconds_ago = current_time - frequency_millis  # Convert 2 seconds to milliseconds
     detection_timestamps = [timestamp for timestamp in detection_timestamps if timestamp >= two_seconds_ago]
 
+is_pouring = False
+
+def turn_pump(state):
+    global is_pouring
+    pass
+#    if state:
+#        if not is_pouring:
+#            GPIO.output(WarmWater, GPIO.HIGH)
+#        is_pouring = True
+#        
+#    else:
+#        if is_pouring:
+#            GPIO.output(WarmWater, GPIO.LOW)
+#        is_pouring = False
+#    if state == True:
+#        if is_pouring == True:
+#            return
+#        else:
+#            GPIO.output(WarmWater, GPIO.HIGH)
+#            is_pouring = True 
+#    else:
+#        if is_pouring == False:
+#            return
+#        else:
+#            GPIO.output(WarmWater, GPIO.LOW)
+#            is_pouring = False
+
 def check_for_consistent_detections():
     """Check if there are enough recent detections to trigger an action."""
     global detection_timestamps
@@ -133,18 +144,20 @@ def check_for_consistent_detections():
         print("Consistent container detections detected!")
         if Mode == 1:
             if IsPushed:
-                GPIO.output(WarmWater, GPIO.HIGH);
-                color = (0, 255, 0)
+                #GPIO.output(WarmWater, GPIO.HIGH)
+                turn_pump(True)
             else:
-                GPIO.output(WarmWater, GPIO.LOW);
-                color = (255, 0, 0)
+                #GPIO.output(WarmWater, GPIO.LOW)
+                turn_pump(False)
         elif Mode == 2:
-            GPIO.output(WarmWater, GPIO.HIGH);
+            #GPIO.output(WarmWater, GPIO.HIGH);
+            turn_pump(True)
         detection_timestamps.clear()
     else:
         GPIO.output(WarmWater, GPIO.LOW);
+        turn_pump(False)
 
-box_rect_size = 15
+box_rect_size = 20
 
 def main():
     model = "modelfile.eim"
@@ -186,9 +199,11 @@ def main():
                 
                 if Mode == 0: # traditional
                     if(IsPushed):
-                        GPIO.output(WarmWater, GPIO.HIGH)
+                        turn_pump(True)
+                        #GPIO.output(WarmWater, GPIO.HIGH)
                     else:
-                        GPIO.output(WarmWater, GPIO.LOW)
+                        #GPIO.output(WarmWater, GPIO.LOW)
+                        turn_pump(False)
                     pass
                 elif Mode == 1: # safe 
                     
@@ -231,7 +246,8 @@ def main():
                     # Check if 2 seconds have passed since the last evaluation
                     if current_time - last_evaluation_time >= frequency_millis:
                         if not IsPushed:
-                            GPIO.output(WarmWater, GPIO.LOW);
+                            #GPIO.output(WarmWater, GPIO.LOW);
+                            turn_pump(False)
                         check_for_consistent_detections()  # Check for consistent detections    
                         # print(RelayState)
                         # GPIO.output(RelayPump, RelayState)    
@@ -263,8 +279,8 @@ def main():
                         
                             if closest_distance < 15:
                                 detection_timestamps.append(current_time)
-                                img = cv2.rectangle(img, (closest_bb['x'], closest_bb['y']), (closest_bb['x'] + closest_bb['width'], closest_bb['y'] + closest_bb['height']), (255, 0, 0), 1)
-                                cv2.rectangle(img, (target[0], target[1]), (target[0] + box_rect_size, target[1] + box_rect_size), color, 1)
+                                img = cv2.rectangle(img, (closest_bb['x'], closest_bb['y']), (closest_bb['x'] + closest_bb['width'], closest_bb['y'] + closest_bb['height']), color, 1)
+                                #cv2.rectangle(img, (target[0], target[1]), (target[0] + box_rect_size, target[1] + box_rect_size), color, 1)
                             
                     next_frame = now() + 5
                     cv2.rectangle(img, (target[0] - box_rect_size // 2, target[1] - box_rect_size // 2), (target[0] + box_rect_size, target[1] + box_rect_size), (0, 255, 0), 2)
