@@ -11,22 +11,30 @@ GPIO.setmode(GPIO.BCM)
 Button_Pin = 14
 
 
-Button1 = 24 
-Button2 = 23 
+Button1 = 1
+Button2 = 0
 Button3 = 27
 Button4 = 17
-Button5 = 25 # Warm
-Button6 = 9  # Temp Lock
-Button7 = 22 # Hot
-#LED1 = 25
-#LED2 = 8
-#LED3 = 7
+Button5 = 25 # warm
+Button6 = 21 # hot
+Button7 = 9 # temp Lock
+LED1 = 20
+LED2 = 11
+LED3 = 8
 
-Solenoid1 = 2
-idk1 = 19
+Solenoid1 = 26
+Solenoid2 = 2
+Solenoid3 = 3
+Solenoid4 = 4
+Solenoid5 = 10
+
+idk1 = 6
+
+Buzzer1 = 5
+Buzzer2 = 6
 
 Heater = 16
-HotWater = 6
+HotWater = 19
 WarmWater = 13
 
 
@@ -40,45 +48,38 @@ GPIO.setup(Button6,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(Button7,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
 
 #LED
-#GPIO.setup(LED1,GPIO.OUT)
-#GPIO.setup(LED2,GPIO.OUT)
-#GPIO.setup(LED3,GPIO.OUT)
+GPIO.setup(LED1,GPIO.OUT)
+GPIO.setup(LED2,GPIO.OUT)
+GPIO.setup(LED3,GPIO.OUT)
 
 #GPIO.setup(Solenoid1,GPIO.OUT)
-#GPIO.setup(HotWater,GPIO.OUT)
-#GPIO.setup(WarmWater,GPIO.OUT)
-#GPIO.setup(Heater,GPIO.OUT)
+#GPIO.setup(Solenoid2,GPIO.OUT)
+#GPIO.setup(Solenoid3,GPIO.OUT)
+#GPIO.setup(Solenoid4,GPIO.OUT)
+#GPIO.setup(Solenoid5,GPIO.OUT)
+
+GPIO.setup(HotWater,GPIO.OUT)
+GPIO.setup(WarmWater,GPIO.OUT)
+GPIO.setup(Heater,GPIO.OUT)
 
 #flag = 0
 #GPIO.output(Solenoid1, GPIO.LOW)
-#GPIO.output(WarmWater, GPIO.LOW)
-#GPIO.output(HotWater, GPIO.LOW)
-#GPIO.output(Heater, GPIO.LOW)
+#GPIO.output(Solenoid2, GPIO.LOW)
+#GPIO.output(Solenoid3, GPIO.LOW)
+#GPIO.output(Solenoid4, GPIO.LOW)
+#GPIO.output(Solenoid5, GPIO.LOW)
+GPIO.output(WarmWater, GPIO.LOW)
+GPIO.output(HotWater, GPIO.LOW)
+GPIO.output(Heater, GPIO.LOW)
+
+GPIO.output(LED1, GPIO.LOW)
+GPIO.output(LED2, GPIO.LOW)
+GPIO.output(LED3, GPIO.LOW)
 
 try:
-    while True: 
-        #GPIO.output(HotWater, GPIO.HIGH);
-#        if GPIO.input(Button2) == GPIO.HIGH:
-#                GPIO.output(Heater, GPIO.HIGH)
-#                print("HEATER ON")
-#                GPIO.output(WarmWater, GPIO.HIGH);
-#        else:
-#                GPIO.output(Heater, GPIO.LOW)
-#                print("HEATER OFF")
-#                GPIO.output(WarmWater, GPIO.LOW);
-
-#        GPIO.output(Heater, GPIO.HIGH)
-#        print("HEATER ON")
-#        sleep(5)
-#        GPIO.output(Heater, GPIO.LOW)
-#        print("HEATER OFF")
-#        sleep(5)
-        #sleep(1)
-        #GPIO.output(WarmWater, GPIO.HIGH);
-        #sleep(1)
-        #GPIO.output(WarmWater, GPIO.LOW);
+    while True:
         #GPIO.output(HotWater, GPIO.LOW);
-        #sleep(2)
+#        sleep(1)
 #        if(GPIO.input(Button4)) == GPIO.HIGH:
 #            GPIO.output(idk2, GPIO.HIGH)
 #        else:

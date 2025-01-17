@@ -48,8 +48,8 @@ def turn_pump(state):
 runner = None
 # if you don't want to see a camera preview, set this to False
 show_camera = True
-if (sys.platform == 'linux' and not os.environ.get('DISPLAY')):
-    show_camera = False
+#if (sys.platform == 'linux' and not os.environ.get('DISPLAY')):
+#    show_camera = False
 
 def now():
     return round(time.time() * 1000)
@@ -151,7 +151,7 @@ def main():
 
                         # Draw the detected circles (if any)
                         if circles is not None:
-                            turn_pump(True)
+                            #turn_pump(True)
                             circles = np.round(circles[0, :]).astype("int")
                             for (x, y, r) in circles:
                                 # Draw the circle in green (thicker)
@@ -223,7 +223,7 @@ def main():
                                     distance_to_edge = distance_to_center - r
                                     if distance_to_edge >= -2:
                                         print("Container is full")
-                                        turn_pump(False) # TOBEDELETED
+                                        #turn_pump(False) # TOBEDELETED
                                         time.sleep(1)
                                         cv2.destroyAllWindows()
                                         sys.exit(0)
@@ -235,31 +235,32 @@ def main():
                     # Use the processed image (blurred with annotations)
                     # (No need to update blurred_img anymore, just use processed_img)
 
-                    if show_camera:
-                        # Combine the original and processed frames side by side
-                        original_frame = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-                        processed_frame = cv2.cvtColor(processed_img, cv2.COLOR_RGB2BGR)
+                if show_camera:
+                    # Combine the original and processed frames side by side
+                    original_frame = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                    processed_frame = cv2.cvtColor(processed_img, cv2.COLOR_RGB2BGR)
 
-                        # Resize the processed frame to match the size of the original frame
-                        processed_frame_resized = cv2.resize(processed_frame, (original_frame.shape[1], original_frame.shape[0]))
+                    # Resize the processed frame to match the size of the original frame
+                    processed_frame_resized = cv2.resize(processed_frame, (original_frame.shape[1], original_frame.shape[0]))
 
-                        # Combine the frames side by side (both frames should have the same dimensions now)
-                        combined_frame = cv2.hconcat([original_frame, processed_frame_resized])
+                    # Combine the frames side by side (both frames should have the same dimensions now)
+                    combined_frame = cv2.hconcat([original_frame, processed_frame_resized])
 
-                        # Show the combined frame
-                        cv2.imshow('Combined Frame (Original | Processed)', combined_frame)
+                    # Show the combined frame
+                    cv2.imshow('Combined Frame (Original | Processed)', combined_frame)
 
-                        # Resize the window to a specific width and height
-                        cv2.resizeWindow('Combined Frame (Original | Processed)', 1200, 900)
+                    # Resize the window to a specific width and height
+                    cv2.resizeWindow('Combined Frame (Original | Processed)', 1200, 900)
 
-                        # Wait for a key press
-                        if cv2.waitKey(1) == ord('q'):
-                            break
+                    # Wait for a key press
+                    if cv2.waitKey(1) == ord('q'):
+                        break
 
 
                 next_frame = now() + 100
 
         finally:
+            GPIO.cleanup()
             if runner:
                 runner.stop()
 
