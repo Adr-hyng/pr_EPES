@@ -15,6 +15,8 @@ import math
 import concurrent.futures
 from edge_impulse_linux.image import ImageImpulseRunner
 
+from button_handler import ButtonHandler
+
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 runner = None
@@ -25,14 +27,36 @@ if sys.platform == 'linux' and not os.environ.get('DISPLAY'):
 SERIAL_PORT = '/dev/ttyUSB0'  # Adjust based on your setup
 BAUD_RATE = 115200
 
-HotWater = 6
+#Button Pins
+Button1 = 1 # Get Water Jug Capacity
+Button2 = 0 # Get Temperature
+Button3 = 27 # Decrease
+Button4 = 17 # Increase
+Button5 = 25 # hot
+Button6 = 21 # warm
+Button7 = 9 # temp Lock
+LED1 = 20
+LED2 = 11
+LED3 = 8
+Buzzer1 = 5
+Buzzer2 = 6
+HotWater = 19
 WarmWater = 13
 
 GPIO.setup(HotWater,GPIO.OUT)
 GPIO.setup(WarmWater,GPIO.OUT)
+#LED
+GPIO.setup(LED1,GPIO.OUT)
+GPIO.setup(LED2,GPIO.OUT)
+GPIO.setup(LED3,GPIO.OUT)
+
 
 GPIO.output(WarmWater, GPIO.LOW);
 GPIO.output(HotWater, GPIO.LOW);
+GPIO.output(LED1, GPIO.LOW)
+GPIO.output(LED2, GPIO.LOW)
+GPIO.output(LED3, GPIO.LOW)
+
 
 detection_timestamps = []  # List to store timestamps of detections
 min_detections = 1  # 20 = 500
@@ -45,8 +69,14 @@ ContainerCap = 0
 Mode = 2
 CurTemperature = 0
 IsPushed = False
+WarmSelected = True
+TempSelectedIndex = 0
+TempSelectedOptions = [50, 60, 70]  # Send the selected Temperaturet to ESP32 - TODO
 
 show_camera = True
+
+def selected_dispenser():
+    return HotWater if not WarmSelected else WarmWater
 
 def now():
     return round(time.time() * 1000)
@@ -75,10 +105,50 @@ def sigint_handler(sig, frame):
 
 signal.signal(signal.SIGINT, sigint_handler)
 
-def help():
-    print('python classify.py <path_to_model.eim> <Camera port ID, only required when more than 1 camera is present>')
+def buttons_thread():
+    global WarmSelected
+    def toggle_warm():
+        global WarmSelected
+        GPIO.output(LED2, GPIO.LOW)
+        GPIO.output(LED1, GPIO.HIGH)
+        WarmSelected = True
+        GPIO.output(WarmWater, GPIO.LOW)
+        GPIO.output(HotWater, GPIO.LOW)
+            
+    def toggle_hot():
+        global WarmSelected
+        GPIO.output(LED1, GPIO.LOW)
+        GPIO.output(LED2, GPIO.HIGH)
+        WarmSelected = False
+        GPIO.output(WarmWater, GPIO.LOW)
+        GPIO.output(HotWater, GPIO.LOW)
+            
+    warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_warm)
+    hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot)
+    temp_lock_button = ButtonHandler(Button7, Buzzer2, Buzzer2, 1.5, long_press_callback=lambda: GPIO.output(LED3, not GPIO.input(LED3)))
 
-def serial_reader():
+    increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
+    decrease_button = ButtonHandler(Button3, Buzzer1, -1, 60, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
+    get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60)
+    get_temperature_button = ButtonHandler(Button2, Buzzer1, -1, 60)
+    
+    try:
+        while True:
+            current_time = time.time()
+            warm_button.update(current_time)
+            hot_button.update(current_time)
+            temp_lock_button.update(current_time)
+            increase_button.update(current_time)
+            decrease_button.update(current_time)
+            get_volume_button.update(current_time)
+            get_temperature_button.update(current_time)
+            time.sleep(0.05)
+    except KeyboardInterrupt:
+        print("exiting")
+    finally:
+        GPIO.cleanup();
+
+def serial_reader_thread():
     global ContainerCap, Mode, CurTemperature, IsPushed
     try:
         with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1) as ser:
@@ -116,15 +186,16 @@ def run_pump_thread(state):
     Directly control the pump state with safe GPIO handling.
     """
     global is_pouring
+    sel_disp_pin = selected_dispenser()
     if state and not is_pouring:
         # Turn on the pump
-        print("Turning pump ON")
-        GPIO.output(WarmWater, GPIO.HIGH)
+        print("Turning pump ON - ", selected_dispenser())
+        GPIO.output(sel_disp_pin, GPIO.HIGH)
         is_pouring = True
     elif not state and is_pouring:
         # Turn off the pump
-        print("Turning pump OFF")
-        GPIO.output(WarmWater, GPIO.LOW)
+        print("Turning pump OFF - ", selected_dispenser())
+        GPIO.output(sel_disp_pin, GPIO.LOW)
         is_pouring = False
 
 def turn_pump(state):
@@ -141,19 +212,12 @@ def check_for_consistent_detections():
     if len(detection_timestamps) >= min_detections:
         print("Consistent container detections detected!")
         if Mode == 1:
-            if IsPushed:
-                #GPIO.output(WarmWater, GPIO.HIGH)
-                turn_pump(True)
-            else:
-                #GPIO.output(WarmWater, GPIO.LOW)
-                turn_pump(False)
+            if IsPushed: turn_pump(True)
+            else: turn_pump(False)
         elif Mode == 2:
-            #GPIO.output(WarmWater, GPIO.HIGH);
             turn_pump(True)
         detection_timestamps.clear()
-    else:
-        GPIO.output(WarmWater, GPIO.LOW);
-        turn_pump(False)
+    else: turn_pump(False)
 
 def main():
     model = "modelfile.eim"
@@ -194,19 +258,12 @@ def main():
                 color = (255, 0, 0)
                 
                 if Mode == 0: # traditional
-                    if(IsPushed):
-                        turn_pump(True)
-                        #GPIO.output(WarmWater, GPIO.HIGH)
-                    else:
-                        #GPIO.output(WarmWater, GPIO.LOW)
-                        turn_pump(False)
+                    if(IsPushed): turn_pump(True)
+                    else: turn_pump(False)
                     pass
                 elif Mode == 1: # safe 
-                    
-                    if IsPushed:
-                        color = (0, 255, 0)
-                    else:
-                        color = (255, 0, 0)
+                    if IsPushed: color = (0, 255, 0)
+                    else: color = (255, 0, 0)
                         
                     if (next_frame > now()):
                         time.sleep((next_frame - now()) / 1000)
@@ -240,9 +297,7 @@ def main():
                     
                     # Check if 2 seconds have passed since the last evaluation
                     if current_time - last_evaluation_time >= frequency_millis:
-                        if not IsPushed:
-                            #GPIO.output(WarmWater, GPIO.LOW);
-                            turn_pump(False)
+                        if not IsPushed: turn_pump(False)
                         check_for_consistent_detections()  # Check for consistent detections    
                         # print(RelayState)
                         # GPIO.output(RelayPump, RelayState)    
@@ -296,6 +351,8 @@ def main():
                 runner.stop()
 
 if __name__ == "__main__":
-    serial_thread = threading.Thread(target=serial_reader, daemon=True)
+    serial_thread = threading.Thread(target=serial_reader_thread, daemon=True)
     serial_thread.start()
+    button_thread = threading.Thread(target=buttons_thread, daemon=True)
+    button_thread.start()
     main()

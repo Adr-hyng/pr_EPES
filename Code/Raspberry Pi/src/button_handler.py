@@ -1,24 +1,7 @@
 import RPi.GPIO as GPIO
-from time import sleep, time
-import os
+from time import sleep
 #Set warnings off (optional)
-
-GPIO.setwarnings(False)
-GPIO.setmode(GPIO.BCM)
 #Set Button and LED pins
-#Button Pins
-Button1 = 1
-Button2 = 0
-Button3 = 27
-Button4 = 17
-Button5 = 25 # hot
-Button6 = 21 # warm
-Button7 = 9 # temp Lock
-LED1 = 20
-LED2 = 11
-LED3 = 8
-Buzzer1 = 5
-Buzzer2 = 6
 
 class ButtonHandler:
     def __init__(
@@ -119,46 +102,3 @@ class ButtonHandler:
                     self.long_blink_stage = 0  # Blink sequence completed
 
         self.last_button_state = self.button_state  # Update last button state
-
-#LED
-GPIO.setup(LED1,GPIO.OUT)
-GPIO.setup(LED2,GPIO.OUT)
-GPIO.setup(LED3,GPIO.OUT)
-
-GPIO.output(LED1, GPIO.LOW)
-GPIO.output(LED2, GPIO.LOW)
-GPIO.output(LED3, GPIO.LOW)
-
-def toggle_warm():
-        GPIO.output(LED1, GPIO.LOW)
-        GPIO.output(LED2, GPIO.HIGH)
-        
-def toggle_hot():
-        GPIO.output(LED2, GPIO.LOW)
-        GPIO.output(LED1, GPIO.HIGH)
-
-
-warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_hot)
-hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_warm)
-temp_lock_button = ButtonHandler(Button7, Buzzer2, Buzzer2, 1.5, long_press_callback=lambda: GPIO.output(LED3, not GPIO.input(LED3)))
-
-increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
-decrease_button = ButtonHandler(Button3, Buzzer1, -1, 60, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
-get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60)
-get_temperature_button = ButtonHandler(Button2, Buzzer1, -1, 60)
-
-try:
-    while True:
-        current_time = time()
-        warm_button.update(current_time)
-        hot_button.update(current_time)
-        temp_lock_button.update(current_time)
-        increase_button.update(current_time)
-        decrease_button.update(current_time)
-        get_volume_button.update(current_time)
-        get_temperature_button.update(current_time)
-        sleep(0.05)
-except KeyboardInterrupt:
-    print("exiting")
-finally:
-    GPIO.cleanup();
