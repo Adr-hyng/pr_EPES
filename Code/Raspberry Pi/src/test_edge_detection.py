@@ -10,41 +10,6 @@ import time
 import numpy as np
 from edge_impulse_linux.image import ImageImpulseRunner
 
-
-# TOBEDELETED
-import RPi.GPIO as GPIO
-GPIO.setwarnings(False)
-GPIO.setmode(GPIO.BCM)
-WarmWater = 13
-GPIO.setup(WarmWater,GPIO.OUT)
-GPIO.output(WarmWater, GPIO.LOW);
-is_pouring = False
-def run_pump_thread(state):
-    """
-    Directly control the pump state with safe GPIO handling.
-    """
-    global is_pouring
-    if state and not is_pouring:
-        # Turn on the pump
-        print("Turning pump ON")
-        GPIO.output(WarmWater, GPIO.HIGH)
-        is_pouring = True
-    elif not state and is_pouring:
-        # Turn off the pump
-        print("Turning pump OFF")
-        GPIO.output(WarmWater, GPIO.LOW)
-        is_pouring = False
-
-def turn_pump(state):
-    """
-    Trigger the pump state change safely.
-    """
-    global is_pouring
-    if (state and not is_pouring) or (not state and is_pouring):
-        run_pump_thread(state)
-
-# TOBEDELETED
-
 runner = None
 # if you don't want to see a camera preview, set this to False
 show_camera = True
@@ -109,6 +74,13 @@ def main():
 
             next_frame = 0  # limit to ~10 fps here
             
+            # Initialize variables to track total radius and area over 10 readings
+            total_radius = 0
+            total_x = 0
+            total_y = 0
+            valid_circle_count = 0
+            frame_count = 0  # Counter for number of frames processed
+            
             for res, img in runner.classifier(videoCaptureDeviceId):
                 if next_frame > now():
                     time.sleep((next_frame - now()) / 1000)
@@ -122,12 +94,17 @@ def main():
                     # Apply Gaussian blur to the entire image
                     blurred_img = cv2.GaussianBlur(processed_img, (21, 21), 0)
                     
+                    # Initialize variables to track the largest circle
+
+                    # Loop through the bounding boxes to process each region
+
+                    # Loop through the bounding boxes to process each region
                     for bb in res["result"]["bounding_boxes"]:
                         print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (
                             bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
 
                         # Configurable offset for ROI size
-                        offset = 45
+                        offset = 70
 
                         # Ensure the ROI remains within the image boundaries
                         roi_x1 = max(0, bb['x'] - offset)
@@ -141,99 +118,60 @@ def main():
                         # Apply Canny edge detection on the ROI only
                         edges_roi = cv2.Canny(roi, 100, 250)
 
-                        # Convert the Canny edges of the ROI to BGR for display
-                        canny_frame_roi = cv2.cvtColor(edges_roi, cv2.COLOR_GRAY2BGR)
-
                         # --- Hough Circle Transform for circle detection ---
                         # Detect circles using Hough Transform in the ROI
                         edges_roi_gray = np.uint8(edges_roi)
+                        
+                        cv2.imshow("Canny Edge", edges_roi)
                         circles = cv2.HoughCircles(edges_roi_gray, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=50, param2=30, minRadius=10, maxRadius=100)
 
-                        # Draw the detected circles (if any)
+                        # Track the largest circle for this frame
+                        largest_circle = None
                         if circles is not None:
-                            #turn_pump(True)
                             circles = np.round(circles[0, :]).astype("int")
                             for (x, y, r) in circles:
-                                # Draw the circle in green (thicker)
                                 cv2.circle(processed_img[roi_y1:roi_y2, roi_x1:roi_x2], (x, y), r, (0, 255, 0), 1)
+                                # If the current circle has a larger radius than the previous largest, update
+                                if largest_circle is None or r > largest_circle[2]:
+                                    largest_circle = (x, y, r)
 
-                        # Find contours in the edges
-                        contours, _ = cv2.findContours(edges_roi, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                        # If a largest circle is found, add its radius and area to the totals
+                        if largest_circle is not None:
+                            x, y, r = largest_circle
+                            area = np.pi * r**2
+                            #print(f"Largest Circle - Center: ({x}, {y}), Radius: {r}, Area: {area:.2f}, Frame: {frame_count:.2f}")
 
-                        farthest_contour = None
-                        max_distance = 0
+                            # Update totals
+                            total_radius += r
+                            total_x += x
+                            total_y += y
+                            valid_circle_count += 1
 
-                        # Calculate the center of the ROI
-                        roi_center_x = (roi_x1 + roi_x2) // 2
-                        roi_center_y = (roi_y1 + roi_y2) // 2
+                        # Increment the frame count
+                        frame_count += 1
 
-                        # Iterate through all contours and filter out non-circular contours based on circularity
-                        for contour in contours:
-                            # Calculate the area and perimeter of the contour
-                            area = cv2.contourArea(contour)
-                            perimeter = cv2.arcLength(contour, True)
+                        # If we've processed 30 frames, calculate the averages
+                        if frame_count >= 10:
+                            if valid_circle_count > 0:
+                                avg_radius = total_radius / valid_circle_count
+                                avg_x = total_x / valid_circle_count
+                                avg_y = total_y / valid_circle_count
+                                
+                                print(f"Average Radius: {avg_radius:.2f}")
+                                print(f"Average X: {avg_x:.2f}, Average Y: {avg_y:.2f}")
+                                
+                                # Draw the average circle based on the calculated averages
+                                cv2.circle(processed_img[roi_y1:roi_y2, roi_x1:roi_x2], (int(avg_x), int(avg_y)), int(avg_radius), (255, 0, 0), 2)
 
-                            if perimeter == 0:  # Skip invalid contours
-                                continue
-
-                            # Calculate circularity
-                            circularity = (4 * np.pi * area) / (perimeter ** 2)
-
-                            # Only consider contours with high circularity (close to 1)
-                            if circularity >= 0.8:
-                                # Calculate the centroid of the contour
-                                moments = cv2.moments(contour)
-                                if moments['m00'] == 0:
-                                    continue  # Skip if contour has no area
-
-                                cx = int(moments['m10'] / moments['m00'])
-                                cy = int(moments['m01'] / moments['m00'])
-
-                                # Calculate the distance from the contour's centroid to the center of the ROI
-                                distance = ((cx - roi_center_x) ** 2 + (cy - roi_center_y) ** 2) ** 0.5
-
-                                # Check if this contour is the farthest
-                                if distance > max_distance:
-                                    max_distance = distance
-                                    farthest_contour = contour
-
-                        # Draw only the farthest contour and make it sparkle with a white glow
-                        if farthest_contour is not None:
-                            # Draw the contour in white with a thicker line (sparkling effect)
-                            cv2.drawContours(processed_img[roi_y1:roi_y2, roi_x1:roi_x2], [farthest_contour], -1, (255, 255, 255), 2)
-
-                            # Draw a thinner green contour on top to make it more prominent
-                            cv2.drawContours(processed_img[roi_y1:roi_y2, roi_x1:roi_x2], [farthest_contour], -1, (0, 255, 0), 1)
-
-                            # Calculate the centroid of the farthest contour
-                            moments = cv2.moments(farthest_contour)
-                            cx = int(moments['m10'] / moments['m00'])
-                            cy = int(moments['m01'] / moments['m00'])
-
-                            # Now calculate the distance to the edge of the detected circle
-                            if circles is not None:
-                                for (x, y, r) in circles:
-                                    # Calculate the distance from the centroid of the farthest contour to the center of the circle
-                                    distance_to_center = ((cx - x) ** 2 + (cy - y) ** 2) ** 0.5
-                                    
-                                    ## Get the average x and y coords from 10 readings of the contours
-                                    ## Get the average distance based on the 10 readings after each 10 readings from avg x and y.
-
-                                    # Calculate the distance to the edge of the circle (radius)
-                                    distance_to_edge = distance_to_center - r
-                                    if distance_to_edge >= -2:
-                                        print("Container is full")
-                                        #turn_pump(False) # TOBEDELETED
-                                        time.sleep(1)
-                                        cv2.destroyAllWindows()
-                                        sys.exit(0)
-                                    print(f"Distance: {distance_to_edge} pixels")
-
-                        # Draw the bounding box on the processed image
-                        processed_img = cv2.rectangle(processed_img, (roi_x1, roi_y1), (roi_x2, roi_y2), (255, 0, 0), 1)
-
+                            # Reset the counters for the next batch of frames
+                            total_radius = 0
+                            total_x = 0  # Initialize total_x to accumulate x coordinates
+                            total_y = 0  # Initialize total_y to accumulate y coordinates
+                            valid_circle_count = 0
+                            frame_count = 0  # Reset the frame counter after each 30-frame batch
                     # Use the processed image (blurred with annotations)
                     # (No need to update blurred_img anymore, just use processed_img)
+
 
                 if show_camera:
                     # Combine the original and processed frames side by side
@@ -260,7 +198,6 @@ def main():
                 next_frame = now() + 100
 
         finally:
-            GPIO.cleanup()
             if runner:
                 runner.stop()
 
