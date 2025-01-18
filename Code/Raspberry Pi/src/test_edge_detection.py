@@ -84,7 +84,12 @@ def main():
             total_y = 0
             valid_circle_count = 0
             frame_count = 0  # Counter for number of frames processed
-            
+
+            # Hardcoded center, size, and offset
+            offset = 40
+            center = (48, 40)
+            size = 40
+
             for res, img in runner.classifier(videoCaptureDeviceId):
                 if next_frame > now():
                     time.sleep((next_frame - now()) / 1000)
@@ -92,128 +97,119 @@ def main():
                 # Make a copy of the original frame for processing
                 processed_img = img.copy()
 
-                if "bounding_boxes" in res["result"].keys() and len(res["result"]["bounding_boxes"]) > 0:
-                    print('Found %d bounding boxes (%d ms.)' % (len(res["result"]["bounding_boxes"]),
-                                                                res['timing']['dsp'] + res['timing']['classification']))
-                    # Apply Gaussian blur to the entire image
-                    blurred_img = cv2.GaussianBlur(processed_img, (7, 7), 0)
-                    
-                    # Initialize variables to track the largest circle
+                # Extract Region of Interest (ROI) based on hardcoded values
+                roi_x1 = max(0, center[0] - offset)
+                roi_y1 = max(0, center[1] - offset)
+                roi_x2 = min(processed_img.shape[1], center[0] + size + offset)
+                roi_y2 = min(processed_img.shape[0], center[1] + size + offset)
 
-                    # Loop through the bounding boxes to process each region
+                # Extract the ROI from the original image (not blurred)
+                roi = img[roi_y1:roi_y2, roi_x1:roi_x2]
 
-                    # Loop through the bounding boxes to process each region
-                    for bb in res["result"]["bounding_boxes"]:
-                        print('\t%s (%.2f): x=%d y=%d w=%d h=%d' % (
-                            bb['label'], bb['value'], bb['x'], bb['y'], bb['width'], bb['height']))
+                # Apply edge detection techniques
+                # Apply Gaussian blur to the ROI
+                blurred_img = cv2.GaussianBlur(roi, (7, 7), 0)
+                
+                # Apply Canny edge detection
+                edges_roi = cv2.Canny(blurred_img, 50, 100)
 
-                        # Configurable offset for ROI size
-                        offset = 50
-                        target = (40, 40)
+                # Apply Sobel edge detection
+                edges_sobel_x = cv2.Sobel(blurred_img, cv2.CV_64F, 1, 0, ksize=3)
+                edges_sobel_y = cv2.Sobel(blurred_img, cv2.CV_64F, 0, 1, ksize=3)
+                edges_sobel = cv2.magnitude(edges_sobel_x, edges_sobel_y)
+                edges_sobel = np.uint8(np.clip(edges_sobel, 0, 255))
 
-                        # Ensure the ROI remains within the image boundaries
-                        roi_x1 = max(0, bb['x'] - offset)
-                        roi_y1 = max(0, bb['y'] - offset)
-                        roi_x2 = min(processed_img.shape[1], bb['x'] + bb['width'] + offset)
-                        roi_y2 = min(processed_img.shape[0], bb['y'] + bb['height'] + offset)
+                # Apply Scharr edge detection
+                edges_scharr_x = cv2.Scharr(blurred_img, cv2.CV_64F, 1, 0)
+                edges_scharr_y = cv2.Scharr(blurred_img, cv2.CV_64F, 0, 1)
+                edges_scharr = cv2.magnitude(edges_scharr_x, edges_scharr_y)
+                edges_scharr = np.uint8(np.clip(edges_scharr, 0, 255))
 
-                        # Extract the ROI from the original image (not blurred)
-                        roi = img[roi_y1:roi_y2, roi_x1:roi_x2]
+                # Apply Laplacian edge detection
+                edges_laplacian = cv2.Laplacian(blurred_img, cv2.CV_64F, ksize=3)
+                edges_laplacian = np.uint8(np.clip(np.absolute(edges_laplacian), 0, 255))
 
-                        # Apply Canny edge detection on the ROI only
-                        edges_roi = cv2.Canny(roi, 50, 100)
+                # Display edge detection results
+                cv2.imshow("Canny Edge", edges_roi)
+                cv2.imshow("Sobel Edge", edges_sobel)
+                cv2.imshow("Scharr Edge", edges_scharr)
+                cv2.imshow("Laplacian Edge", edges_laplacian)
 
-                        # --- Hough Circle Transform for circle detection ---
-                        # Detect circles using Hough Transform in the ROI
-                        edges_roi_gray = np.uint8(edges_roi)
-                        
-                        cv2.imshow("Canny Edge", edges_roi)
-                        circles = cv2.HoughCircles(edges_roi_gray, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=50, param2=30, minRadius=10, maxRadius=100)
+                # --- Hough Circle Transform for circle detection ---
+                # Detect circles using Hough Transform in the ROI
+                edges_roi_gray = np.uint8(edges_roi)
+                circles = cv2.HoughCircles(edges_roi_gray, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=50, param2=30, minRadius=10, maxRadius=100)
 
-                        # Track the largest circle for this frame
-                        largest_circle = None
-                        if circles is not None:
-                            circles = np.round(circles[0, :]).astype("int")
-                            for (x, y, r) in circles:
-                                #cv2.circle(processed_img[roi_y1:roi_y2, roi_x1:roi_x2], (x, y), r, (0, 255, 0), 1)
-                                # If the current circle has a larger radius than the previous largest, update
-                                if largest_circle is None or r > largest_circle[0]:
-                                    largest_circle = (x, y, r)
+                # Track the largest circle for this frame
+                largest_circle = None
+                if circles is not None:
+                    circles = np.round(circles[0, :]).astype("int")
+                    for (x, y, r) in circles:
+                        if largest_circle is None or (r > (largest_circle[2] * 0.7) and r <= (largest_circle[2] * 0.9)):
+                            cv2.circle(processed_img[roi_y1:roi_y2, roi_x1:roi_x2], (x, y), r, (255, 0, 0), 1)
+                            largest_circle = (x, y, r)
+                            
+                            
 
-                        # If a largest circle is found, add its radius and area to the totals
-                        if largest_circle is not None:
-                            x, y, r = largest_circle
-                            area = np.pi * r**2
-                            #print(f"Largest Circle - Center: ({x}, {y}), Radius: {r}, Area: {area:.2f}, Frame: {frame_count:.2f}")
+                # If a largest circle is found, add its radius and area to the totals
+                if largest_circle is not None:
+                    x, y, r = largest_circle
+                    area = np.pi * r**2
+                    # Update totals
+                    total_radius += r
+                    total_x += x
+                    total_y += y
+                    valid_circle_count += 1
 
-                            # Update totals
-                            total_radius += r
-                            total_x += x
-                            total_y += y
-                            valid_circle_count += 1
+                # Increment the frame count
+                frame_count += 1
 
-                        # Increment the frame count
-                        frame_count += 1
-                        
-                        #cv2.rectangle(img, (target[0] - offset // 2, target[1] - offset // 2), (target[0] + offset, target[1] + offset), (0, 255, 0), 2)
+                # If we've processed 30 frames, calculate the averages
+                if frame_count >= 10:
+                    if valid_circle_count > 0:
+                        avg_radius = total_radius / valid_circle_count
+                        avg_x = total_x / valid_circle_count
+                        avg_y = total_y / valid_circle_count
 
-                        # If we've processed 30 frames, calculate the averages
-                        if frame_count >= 10:
-                            if valid_circle_count > 0:
-                                avg_radius = total_radius / valid_circle_count
-                                avg_x = total_x / valid_circle_count
-                                avg_y = total_y / valid_circle_count
-                                
-                                print(f"Average Radius: {avg_radius:.2f}")
-                                print(f"Average X: {avg_x:.2f}, Average Y: {avg_y:.2f}")
-                                
-                                # Draw the average circle based on the calculated averages
-                                cv2.circle(processed_img[roi_y1:roi_y2, roi_x1:roi_x2], (int(avg_x), int(avg_y)), int(avg_radius), (255, 0, 0), 1)
+                        print(f"Average Radius: {avg_radius:.2f}")
+                        print(f"Average X: {avg_x:.2f}, Average Y: {avg_y:.2f}")
 
-                            # Reset the counters for the next batch of frames
-                            total_radius = 0
-                            total_x = 0  # Initialize total_x to accumulate x coordinates
-                            total_y = 0  # Initialize total_y to accumulate y coordinates
-                            valid_circle_count = 0
-                            frame_count = 0  # Reset the frame counter after each 30-frame batch
-                    # Use the processed image (blurred with annotations)
-                    # (No need to update blurred_img anymore, just use processed_img)
+                        # Draw the average circle based on the calculated averages
+                        cv2.circle(processed_img[roi_y1:roi_y2, roi_x1:roi_x2], (int(avg_x), int(avg_y)), int(avg_radius), (255, 0, 0), 1)
 
+                    # Reset the counters for the next batch of frames
+                    total_radius = 0
+                    total_x = 0
+                    total_y = 0
+                    valid_circle_count = 0
+                    frame_count = 0  # Reset the frame counter after each 10-frame batch
 
-                if show_camera:
-                    # Combine the original and processed frames side by side
-                    original_frame = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-                    processed_frame = cv2.cvtColor(processed_img, cv2.COLOR_RGB2BGR)
+                # Combine the original and processed frames side by side for display
+                original_frame = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                processed_frame = cv2.cvtColor(processed_img, cv2.COLOR_RGB2BGR)
 
-                    # Scale factor for enlarging the frames
-                    scale_factor = 3  # Adjust this value as needed for your desired size
-                    original_frame_resized = cv2.resize(
-                        original_frame, 
-                        (int(original_frame.shape[1] * scale_factor), int(original_frame.shape[0] * scale_factor))
-                    )
-                    processed_frame_resized = cv2.resize(
-                        processed_frame, 
-                        (original_frame_resized.shape[1], original_frame_resized.shape[0])
-                    )
+                # Scale factor for enlarging the frames
+                scale_factor = 3
+                original_frame_resized = cv2.resize(original_frame, (int(original_frame.shape[1] * scale_factor), int(original_frame.shape[0] * scale_factor)))
+                processed_frame_resized = cv2.resize(processed_frame, (original_frame_resized.shape[1], original_frame_resized.shape[0]))
 
-                    # Combine the frames side by side (both frames should have the same dimensions now)
-                    combined_frame = cv2.hconcat([original_frame_resized, processed_frame_resized])
-                    cv2.namedWindow('Combined Frame (Original | Processed)', cv2.WINDOW_NORMAL)
+                # Combine the frames side by side
+                combined_frame = cv2.hconcat([original_frame_resized, processed_frame_resized])
+                cv2.namedWindow('Combined Frame (Original | Processed)', cv2.WINDOW_NORMAL)
 
-                    # Show the combined frame
-                    cv2.imshow('Combined Frame (Original | Processed)', combined_frame)
+                # Show the combined frame
+                cv2.imshow('Combined Frame (Original | Processed)', combined_frame)
 
-                    # Wait for a key press
-                    if cv2.waitKey(1) == ord('q'):
-                        break
-
-
+                # Wait for a key press to quit
+                if cv2.waitKey(1) == ord('q'):
+                    break
 
                 next_frame = now() + 100
 
         finally:
             if runner:
                 runner.stop()
+
 
 if __name__ == "__main__":
     main()

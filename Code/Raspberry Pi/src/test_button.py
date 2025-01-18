@@ -12,9 +12,9 @@ Button_Pin = 14
 
 
 Button1 = 1
-Button2 = 0
+Button2 = 7 # Change to other pin
 Button3 = 27
-Button4 = 17
+Button4 = 22
 Button5 = 25 # warm
 Button6 = 21 # hot
 Button7 = 9 # temp Lock
@@ -34,8 +34,8 @@ Buzzer1 = 5
 Buzzer2 = 6
 
 Heater = 16
-HotWater = 19
-WarmWater = 13
+HotWater = 26
+WarmWater = 19
 
 
 #Setup Button and LED
@@ -78,8 +78,10 @@ GPIO.output(LED3, GPIO.LOW)
 
 try:
     while True:
-        #GPIO.output(HotWater, GPIO.LOW);
-#        sleep(1)
+        GPIO.output(Heater, GPIO.HIGH);
+        sleep(3)
+        GPIO.output(Heater, GPIO.LOW);
+        sleep(3)
 #        if(GPIO.input(Button4)) == GPIO.HIGH:
 #            GPIO.output(idk2, GPIO.HIGH)
 #        else:

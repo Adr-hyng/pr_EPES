@@ -28,23 +28,25 @@ SERIAL_PORT = '/dev/ttyUSB0'  # Adjust based on your setup
 BAUD_RATE = 115200
 
 #Button Pins
-Button1 = 1 # Get Water Jug Capacity
-Button2 = 0 # Get Temperature
+Button1 = 0 # Get Water Jug Capacity
+Button2 = 1 # Get Temperature
 Button3 = 27 # Decrease
-Button4 = 17 # Increase
+Button4 = 22 # Increase
 Button5 = 25 # hot
 Button6 = 21 # warm
 Button7 = 9 # temp Lock
 LED1 = 20
 LED2 = 11
 LED3 = 8
-Buzzer1 = 5
-Buzzer2 = 6
-HotWater = 19
-WarmWater = 13
+Buzzer1 = 6
+Buzzer2 = 13
+HotWater = 26
+WarmWater = 19
+Heater = 16
 
 GPIO.setup(HotWater,GPIO.OUT)
 GPIO.setup(WarmWater,GPIO.OUT)
+GPIO.setup(Heater,GPIO.OUT)
 #LED
 GPIO.setup(LED1,GPIO.OUT)
 GPIO.setup(LED2,GPIO.OUT)
@@ -53,6 +55,7 @@ GPIO.setup(LED3,GPIO.OUT)
 
 GPIO.output(WarmWater, GPIO.LOW);
 GPIO.output(HotWater, GPIO.LOW);
+GPIO.output(Heater, GPIO.LOW);
 GPIO.output(LED1, GPIO.LOW)
 GPIO.output(LED2, GPIO.LOW)
 GPIO.output(LED3, GPIO.LOW)
@@ -106,34 +109,53 @@ def sigint_handler(sig, frame):
 signal.signal(signal.SIGINT, sigint_handler)
 
 def buttons_thread():
-    global WarmSelected
+    global WarmSelected, TempSelectedIndex
     def toggle_warm():
         global WarmSelected
-        GPIO.output(LED2, GPIO.LOW)
-        GPIO.output(LED1, GPIO.HIGH)
+        GPIO.output(LED1, GPIO.LOW)
+        GPIO.output(LED2, GPIO.HIGH)
         WarmSelected = True
         GPIO.output(WarmWater, GPIO.LOW)
         GPIO.output(HotWater, GPIO.LOW)
             
     def toggle_hot():
         global WarmSelected
-        GPIO.output(LED1, GPIO.LOW)
-        GPIO.output(LED2, GPIO.HIGH)
+        GPIO.output(LED2, GPIO.LOW)
+        GPIO.output(LED1, GPIO.HIGH)
         WarmSelected = False
         GPIO.output(WarmWater, GPIO.LOW)
         GPIO.output(HotWater, GPIO.LOW)
+        
+    def increase_temp():
+        global TempSelectedIndex
+        if GPIO.input(LED3) != GPIO.LOW: return;
+        if(TempSelectedIndex >= len(TempSelectedOptions) - 1): return;
+        TempSelectedIndex += 1
+        
+    def decrease_temp():
+        global TempSelectedIndex
+        if GPIO.input(LED3) != GPIO.LOW: return;
+        if(TempSelectedIndex == 0): return;
+        TempSelectedIndex -= 1
+        
+    def electric_heater_system():
+        if (CurTemperature >= TempSelectedOptions[TempSelectedIndex] and GPIO.input(Heater) == GPIO.HIGH):
+            GPIO.output(Heater, GPIO.LOW)
+        elif CurTemperature <= (TempSelectedOptions[TempSelectedIndex] - 5) and GPIO.input(Heater) == GPIO.LOW:
+            GPIO.output(Heater, GPIO.HIGH)
             
     warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_warm)
     hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot)
     temp_lock_button = ButtonHandler(Button7, Buzzer2, Buzzer2, 1.5, long_press_callback=lambda: GPIO.output(LED3, not GPIO.input(LED3)))
 
-    increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
-    decrease_button = ButtonHandler(Button3, Buzzer1, -1, 60, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
+    increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_press_callback=increase_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
+    decrease_button = ButtonHandler(Button3, Buzzer1, -1, 60, short_press_callback=decrease_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
     get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60)
     get_temperature_button = ButtonHandler(Button2, Buzzer1, -1, 60)
     
     try:
         while True:
+            electric_heater_system()
             current_time = time.time()
             warm_button.update(current_time)
             hot_button.update(current_time)
@@ -166,7 +188,7 @@ def serial_reader_thread():
                             CurTemperature = int(parts[2])
                             IsPushed = int(parts[3])
                             print(f"Parsed data: ContainerCap={ContainerCap}, Mode={Mode}, "
-                                  f"CurTemperature={CurTemperature}, IsPushed={IsPushed}")
+                                  f"CurTemperature={CurTemperature}, IsPushed={IsPushed}, Heater={GPIO.input(Heater)}, SelTemp={TempSelectedOptions[TempSelectedIndex]} degree C")
                         else:
                             print(f"Unexpected data format: {line}")
                     except ValueError:
@@ -346,6 +368,7 @@ def main():
         finally:
             GPIO.output(WarmWater, GPIO.LOW);
             GPIO.output(HotWater, GPIO.LOW);
+            GPIO.output(Heater, GPIO.LOW);
             GPIO.cleanup();
             if runner:
                 runner.stop()
