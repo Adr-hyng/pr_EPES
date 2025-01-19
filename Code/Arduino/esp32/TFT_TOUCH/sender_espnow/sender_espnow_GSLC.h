@@ -115,6 +115,7 @@ typedef struct struct_message {
   bool heaterActivated;
   bool isStablized;
   bool childLockActivated;
+  bool resetMode;
 } struct_message;
 // ------------------------------------------------
 

@@ -92,7 +92,14 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   Serial.println(myData.CurTemperature);
   Serial.print("Child-Lock: ");
   Serial.println(myData.childLockActivated);
+  Serial.print("Reset: ");
+  Serial.println(myData.resetMode);
   Serial.println();
+
+  if(myData.resetMode) {
+    myData.resetMode = 0;
+    ESP.restart();
+  }
 
   m_pElemChildLock = gslc_PageFindElemById(&m_gui, gslc_GetPageCur(&m_gui), ChildLockIndicator);
   gslc_ElemSetGlowEn(&m_gui, m_pElemChildLock, myData.childLockActivated);

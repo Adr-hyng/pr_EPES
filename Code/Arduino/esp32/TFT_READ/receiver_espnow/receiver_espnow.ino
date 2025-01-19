@@ -88,6 +88,7 @@ typedef struct struct_message {
   bool heaterActivated;
   bool isStablized;
   bool childLockActivated;
+  bool resetMode;
 } struct_message;
 struct_message myData;
 bool redrawRequired = false;
@@ -242,15 +243,6 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   // Serial.println();
   
   gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
-  static char TCurTemp[4] = ""; // Ensure TCurTemp is properly declared
-  snprintf(TCurTemp, sizeof(TCurTemp), "%d", myData.CurTemperature);
-  if (m_pElemOutCurTemp != NULL) {
-    gslc_ElemSetTxtStr(&m_gui, m_pElemOutCurTemp, TCurTemp);
-    // gslc_ElemSetRedraw(&m_gui, m_pElemOutCurTemp, GSLC_REDRAW_FULL);
-  } 
-  // else {
-  //     Serial.println("Error: m_pElemOutCurTemp is NULL");
-  // }
   redrawRequired = true;
 }
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
@@ -267,6 +259,29 @@ bool onStateChange(bool& currentState, bool newValue) {
     return true; // Change detected
   }
   return false; // No change
+}
+void UpdateThermometerImage() {
+    static short lastSelTemp_MRange = -1; // Initialize with an invalid value
+
+    if (myData.SelTemp_MRange != lastSelTemp_MRange) {
+        lastSelTemp_MRange = myData.SelTemp_MRange; // Update the last known value
+
+        if (myData.SelTemp_MRange == 85) {
+            UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER);
+        } else if (myData.SelTemp_MRange == 75) {
+            UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER_1);
+        } else {
+            UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER_2);
+        }
+
+        static char TSelTemp[4] = ""; // Ensure TCurTemp is properly declared
+        snprintf(TSelTemp, sizeof(TSelTemp), "%d", myData.SelTemp_MRange);
+        if (m_pElemOutSelTemp != NULL) {
+          gslc_ElemSetTxtStr(&m_gui, m_pElemOutSelTemp, TSelTemp);
+        } 
+
+        // gslc_ElemSetRedraw(&m_gui, m_pElemOutSelTemp, GSLC_REDRAW_FOCUS);
+    }
 }
 void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigned short* newBitmap) 
 {
@@ -364,6 +379,11 @@ void setup()
     // Serial.println("Failed to add peer");
     return;
   }
+
+  myData.resetMode = 1;
+  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&myData, sizeof(myData));
+  delay(50);
+  myData.resetMode = 0;
 }
 
 Timer timer1(500, []() {
@@ -414,24 +434,22 @@ void loop()
     String receivedData = Serial.readStringUntil('\n'); // Read until newline
     // Parse the data
     int dummy; // Placeholder for the first value (0)
-    int tempSelTemp_MRange, tempHeaterActivated, tempChildLockActivated; // Temporary variables for parsing
-    int parsedValues = sscanf(receivedData.c_str(), "%d,%d,%d,%d",
+    int tempSelTemp_MRange, tempHeaterActivated, tempChildLockActivated, tempResetMode; // Temporary variables for parsing
+    int parsedValues = sscanf(receivedData.c_str(), "%d,%d,%d,%d,%d",
                                &dummy,
                                &tempSelTemp_MRange,
                                &tempHeaterActivated,
-                               &tempChildLockActivated);
-
-    if (parsedValues == 4) { // Ensure all 4 values were parsed successfully
+                               &tempChildLockActivated,
+                               &tempResetMode);
+    if (parsedValues == 5) {
       if (dummy == 0) { // Only assign values if dummy is 0
         myData.SelTemp_MRange = tempSelTemp_MRange;
 
-        if(myData.SelTemp_MRange == 85) {
-          UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER);
-        } else if(myData.SelTemp_MRange == 75) {
-          UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER_1);
-        } else {
-          UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER_2);
+        if (onStateChange(myData.resetMode, tempResetMode)) {
+          ESP.restart();
         }
+
+        UpdateThermometerImage();
 
         if(onStateChange(myData.heaterActivated, tempHeaterActivated)) {
           m_pElemHeaterState = gslc_PageFindElemById(&m_gui, gslc_GetPageCur(&m_gui), HeaterIndicator);
