@@ -72,10 +72,11 @@ ContainerCap = 0
 Mode = 2
 CurTemperature = 0
 IsPushed = False
-WarmSelected = True 
+WarmSelected = True
+ChildLockActivated = False
 TempSelectedIndex = 0
 TempSelectedOptions = [65, 75, 85]  # Send the selected Temperaturet to ESP32 - TODO
-ChildLockActivated = False # Send to ESP32
+
 HeaterActivated = False # Send to ESP32
 
 ResetMode = 0
@@ -114,21 +115,35 @@ signal.signal(signal.SIGINT, sigint_handler)
 
 def buttons_thread():
     global WarmSelected, TempSelectedIndex, HeaterActivated, ChildLockActivated, ResetMode
-    def toggle_warm():
+    # Track the previous state of WarmSelected
+    previous_warm_selected = None
+
+    def dispense_toggling_mechanism():
+        nonlocal previous_warm_selected
         global WarmSelected
-        GPIO.output(LED2, GPIO.LOW)
-        GPIO.output(LED1, GPIO.HIGH)
-        WarmSelected = True
-        GPIO.output(WarmWater, GPIO.LOW)
-        GPIO.output(HotWater, GPIO.LOW)
+
+        # Check if the state has changed
+        if WarmSelected != previous_warm_selected:
+            previous_warm_selected = WarmSelected  # Update the previous state
+            GPIO.output(LED1, GPIO.LOW)
+            GPIO.output(LED2, GPIO.LOW)
+            if WarmSelected:       
+                print("Warm is selected")     
+                GPIO.output(LED1, GPIO.HIGH)
+                GPIO.output(WarmWater, GPIO.LOW)
+                GPIO.output(HotWater, GPIO.LOW)
+            else:
+                print("Warm is not selected")    
+                GPIO.output(LED2, GPIO.HIGH)
+                GPIO.output(WarmWater, GPIO.LOW)
+                GPIO.output(HotWater, GPIO.LOW)
             
-    def toggle_hot():
+    def toggle_hot_water():
         global WarmSelected
-        GPIO.output(LED1, GPIO.LOW)
-        GPIO.output(LED2, GPIO.HIGH)
         WarmSelected = False
-        GPIO.output(WarmWater, GPIO.LOW)
-        GPIO.output(HotWater, GPIO.LOW)
+    def toggle_warm_water():
+        global WarmSelected
+        WarmSelected = True
         
     def increase_temp():
         global TempSelectedIndex
@@ -159,17 +174,18 @@ def buttons_thread():
         ResetMode = 1;
         print("RESET MODE = ", ResetMode)
     
-    warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_warm)
-    hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot, long_press_callback=toggle_childlock)
+    warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_warm_water)
+    hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot_water, long_press_callback=toggle_childlock)
     temp_lock_button = ButtonHandler(Button7, Buzzer2, Buzzer2, 1.5, long_press_callback=lambda: GPIO.output(LED3, not GPIO.input(LED3)))
 
     increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_press_callback=increase_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
     decrease_button = ButtonHandler(Button3, Buzzer1, -1, 60, short_press_callback=decrease_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
     get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60)
-    get_temperature_button = ButtonHandler(Button2, Buzzer1, Buzzer1, 3, long_press_callback=pressed_reset)
+    get_temperature_button = ButtonHandler(Button2, Buzzer1, Buzzer1, 5, long_press_callback=pressed_reset)
     
     try:
         while True:
+            dispense_toggling_mechanism()
             electric_heater_system()
             current_time = time.time()
             warm_button.update(current_time)
