@@ -1,0 +1,245 @@
+//<File !Start!>
+// FILE: [sender_espnow_GSLC.h]
+// Created by GUIslice Builder version: [0.17.b34]
+//
+// GUIslice Builder Generated GUI Framework File
+//
+// For the latest guides, updates and support view:
+// https://github.com/ImpulseAdventure/GUIslice
+//
+//<File !End!>
+
+#ifndef _GUISLICE_GEN_H
+#define _GUISLICE_GEN_H
+
+// ------------------------------------------------
+// Headers to include
+// ------------------------------------------------
+#include "GUIslice.h"
+#include "GUIslice_drv.h"
+
+#include <nvs_flash.h>
+#include <nvs.h>
+
+// NVS namespace and key for storing the mode
+#define NVS_NAMESPACE "storage"
+#define NVS_KEY_MODE "last_mode"
+#define NVS_KEY_LOCK_MODE "lock_state"
+
+// Include any extended elements
+//<Includes !Start!>
+// Include extended elements
+#include "elem/XRingGauge.h"
+//<Includes !End!>
+
+// ------------------------------------------------
+// Headers and Defines for fonts
+// Note that font files are located within the Adafruit-GFX library folder:
+// ------------------------------------------------
+//<Fonts !Start!>
+#if !defined(DRV_DISP_TFT_ESPI)
+  #error E_PROJECT_OPTIONS tab->Graphics Library should be Adafruit_GFX
+#endif
+#include <TFT_eSPI.h>
+#include "Seven_Segment22pt7b.h"
+//<Fonts !End!>
+
+// ------------------------------------------------
+// Defines for resources
+// ------------------------------------------------
+//<Resources !Start!>
+extern "C" const unsigned short AUTO_BUTTON[] PROGMEM;
+extern "C" const unsigned short AUTO_BUTTON_SEL[] PROGMEM;
+extern "C" const unsigned short CHILD_LOCK_GLOW[] PROGMEM;
+extern "C" const unsigned short CHILD_LOCK_NORMALIZE[] PROGMEM;
+extern "C" const unsigned short DROPLET_ICON[] PROGMEM;
+extern "C" const unsigned short SAFE_BUTTON[] PROGMEM;
+extern "C" const unsigned short SAFE_BUTTON_SEL[] PROGMEM;
+extern "C" const unsigned short TRAD_BUTTON[] PROGMEM;
+extern "C" const unsigned short TRAD_BUTTON_SEL[] PROGMEM;
+//<Resources !End!>
+
+// ------------------------------------------------
+// Enumerations for pages, elements, fonts, images
+// ------------------------------------------------
+//<Enum !Start!>
+enum {E_PG_MAIN};
+enum {AutoBtn,ChildLockIndicator,ContainerCap,E_DRAW_LINE1,E_DRAW_LINE2
+      ,E_ELEM_IMAGE9,E_ELEM_TEXT2,SafeBtn,TradBtn,WaterCapGauge};
+// Must use separate enum for fonts with MAX_FONT at end to use gslc_FontSet.
+enum {E_BUILTIN5X8,E_SEVEN_SEGMENT22,MAX_FONT};
+//<Enum !End!>
+
+// ------------------------------------------------
+// Instantiate the GUI
+// ------------------------------------------------
+
+// ------------------------------------------------
+// Define the maximum number of elements and pages
+// ------------------------------------------------
+//<ElementDefines !Start!>
+#define MAX_PAGE                1
+
+#define MAX_ELEM_PG_MAIN 10 // # Elems total on page
+#define MAX_ELEM_PG_MAIN_RAM MAX_ELEM_PG_MAIN // # Elems in RAM
+//<ElementDefines !End!>
+
+// ------------------------------------------------
+// Create element storage
+// ------------------------------------------------
+gslc_tsGui                      m_gui;
+gslc_tsDriver                   m_drv;
+gslc_tsFont                     m_asFont[MAX_FONT];
+gslc_tsPage                     m_asPage[MAX_PAGE];
+
+//<GUI_Extra_Elements !Start!>
+gslc_tsElem                     m_asPage1Elem[MAX_ELEM_PG_MAIN_RAM];
+gslc_tsElemRef                  m_asPage1ElemRef[MAX_ELEM_PG_MAIN];
+gslc_tsXRingGauge               m_sXRingGauge1;
+
+#define MAX_STR                 100
+
+//<GUI_Extra_Elements !End!>
+
+// ------------------------------------------------
+// Program Globals
+bool g_ButtonFlags[4] = {false, false, false, true}; // Glowing buttons
+// ------------------------------------------------
+
+// Element References for direct access
+//<Extern_References !Start!>
+extern gslc_tsElemRef* m_pElemXRingGauge1;
+//<Extern_References !End!>
+
+// Define debug message function
+static int16_t DebugOut(char ch);
+
+// ------------------------------------------------
+// Callback Methods
+// ------------------------------------------------
+void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigned short* newBitmap);
+void save_to_nvs(const char* key, int value);
+int load_from_nvs(const char* key, int default_value);
+void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem);
+bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY);
+bool CbCheckbox(void* pvGui, void* pvElemRef, int16_t nSelId, bool bState);
+bool CbDrawScanner(void* pvGui,void* pvElemRef,gslc_teRedrawType eRedraw);
+bool CbKeypad(void* pvGui, void *pvElemRef, int16_t nState, void* pvData);
+bool CbListbox(void* pvGui, void* pvElemRef, int16_t nSelId);
+bool CbSlidePos(void* pvGui,void* pvElemRef,int16_t nPos);
+bool CbSpinner(void* pvGui, void *pvElemRef, int16_t nState, void* pvData);
+bool CbTickScanner(void* pvGui,void* pvScope);
+
+// ------------------------------------------------
+// Create page elements
+// ------------------------------------------------
+void InitGUIslice_gen()
+{
+  gslc_tsElemRef* pElemRef = NULL;
+
+  if (!gslc_Init(&m_gui,&m_drv,m_asPage,MAX_PAGE,m_asFont,MAX_FONT)) { return; }
+
+  // Initialize NVS
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+      ESP_ERROR_CHECK(nvs_flash_erase());
+      ret = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(ret);
+
+  // Load the last mode from NVS
+  int last_mode = load_from_nvs(NVS_KEY_MODE, 0);
+  int last_lock_state = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
+
+  // ------------------------------------------------
+  // Load Fonts
+  // ------------------------------------------------
+//<Load_Fonts !Start!>
+    if (!gslc_FontSet(&m_gui,E_BUILTIN5X8,GSLC_FONTREF_PTR,NULL,1)) { return; }
+    if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT22,GSLC_FONTREF_PTR,&Seven_Segment22pt7b,1)) { return; }
+//<Load_Fonts !End!>
+
+//<InitGUI !Start!>
+  gslc_PageAdd(&m_gui,E_PG_MAIN,m_asPage1Elem,MAX_ELEM_PG_MAIN_RAM,m_asPage1ElemRef,MAX_ELEM_PG_MAIN);
+
+  // NOTE: The current page defaults to the first page added. Here we explicitly
+  //       ensure that the main page is the correct page no matter the add order.
+  gslc_SetPageCur(&m_gui,E_PG_MAIN);
+  
+  // Set Background to a flat color
+  gslc_SetBkgndColor(&m_gui,GSLC_COL_BLACK);
+
+  // -----------------------------------
+  // PAGE: E_PG_MAIN
+  
+  
+  // Create E_ELEM_TEXT2 text label
+  pElemRef = gslc_ElemCreateTxt(&m_gui,E_ELEM_TEXT2,E_PG_MAIN,(gslc_tsRect){90,15,24,30},
+    (char*)"%",0,E_SEVEN_SEGMENT22);
+  gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_BOT_RIGHT);
+  gslc_ElemSetFillEn(&m_gui,pElemRef,false);
+  gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
+  
+  // Create ContainerCap text label
+  pElemRef = gslc_ElemCreateTxt(&m_gui,ContainerCap,E_PG_MAIN,(gslc_tsRect){32,15,46,30},
+    (char*)"100",0,E_SEVEN_SEGMENT22);
+  gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_BOT_RIGHT);
+  gslc_ElemSetFillEn(&m_gui,pElemRef,false);
+  gslc_ElemSetTxtCol(&m_gui,pElemRef,GSLC_COL_WHITE);
+  
+  // Create AutoBtn button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,AutoBtn,E_PG_MAIN,(gslc_tsRect){150,7,85,85},
+          gslc_GetImageFromProg((const unsigned char*)AUTO_BUTTON,GSLC_IMGREF_FMT_BMP24),
+          gslc_GetImageFromProg((const unsigned char*)AUTO_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
+          &CbBtnCommon);
+  
+  // Create SafeBtn button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,SafeBtn,E_PG_MAIN,(gslc_tsRect){150,116,85,85},
+          gslc_GetImageFromProg((const unsigned char*)SAFE_BUTTON,GSLC_IMGREF_FMT_BMP24),
+          gslc_GetImageFromProg((const unsigned char*)SAFE_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
+          &CbBtnCommon);
+  
+  // Create TradBtn button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,TradBtn,E_PG_MAIN,(gslc_tsRect){150,225,85,85},
+          gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON,GSLC_IMGREF_FMT_BMP24),
+          gslc_GetImageFromProg((const unsigned char*)TRAD_BUTTON_SEL,GSLC_IMGREF_FMT_BMP24),
+          &CbBtnCommon);
+
+  // Create ring gauge WaterCapGauge 
+  static char m_sRingText1[11] = "";
+  pElemRef = gslc_ElemXRingGaugeCreate(&m_gui,WaterCapGauge,E_PG_MAIN,&m_sXRingGauge1,
+          (gslc_tsRect){-121,65,203,203},
+          (char*)m_sRingText1,11,E_BUILTIN5X8);
+  gslc_ElemXRingGaugeSetValRange(&m_gui, pElemRef, 0, 100);
+  gslc_ElemXRingGaugeSetVal(&m_gui, pElemRef, 2); // Set initial value
+  gslc_ElemXRingGaugeSetThickness(&m_gui,pElemRef, 20);
+  gslc_ElemXRingGaugeSetColorActiveFlat(&m_gui,pElemRef, GSLC_COL_WHITE);
+  gslc_ElemXRingGaugeSetColorInactive(&m_gui,pElemRef, GSLC_COL_GRAY_DK3);
+  m_pElemXRingGauge1 = pElemRef;
+ 
+  // Create E_ELEM_IMAGE9 using Image 
+  pElemRef = gslc_ElemCreateImg(&m_gui,E_ELEM_IMAGE9,E_PG_MAIN,(gslc_tsRect){-58,110,76,101},
+    gslc_GetImageFromProg((const unsigned char*)DROPLET_ICON,GSLC_IMGREF_FMT_BMP24));
+  
+  // Create ChildLockIndicator button with image label
+  pElemRef = gslc_ElemCreateBtnImg(&m_gui,ChildLockIndicator,E_PG_MAIN,(gslc_tsRect){79,262,45,45},
+          gslc_GetImageFromProg((const unsigned char*)CHILD_LOCK_NORMALIZE,GSLC_IMGREF_FMT_BMP24),
+          gslc_GetImageFromProg((const unsigned char*)CHILD_LOCK_GLOW,GSLC_IMGREF_FMT_BMP24),
+          &CbBtnCommon);
+
+  // Create E_DRAW_LINE1 line 
+  pElemRef = gslc_ElemCreateLine(&m_gui,E_DRAW_LINE1,E_PG_MAIN,193,92,193,116);
+  gslc_ElemSetCol(&m_gui,pElemRef,GSLC_COL_BLACK,GSLC_COL_WHITE,GSLC_COL_WHITE);
+
+  // Create E_DRAW_LINE2 line 
+  pElemRef = gslc_ElemCreateLine(&m_gui,E_DRAW_LINE2,E_PG_MAIN,193,201,193,225);
+  gslc_ElemSetCol(&m_gui,pElemRef,GSLC_COL_BLACK,GSLC_COL_WHITE,GSLC_COL_WHITE);
+//<InitGUI !End!>
+
+//<Startup !Start!>
+  gslc_GuiRotate(&m_gui, 0);
+//<Startup !End!>
+
+}
+
+#endif // end _GUISLICE_GEN_H

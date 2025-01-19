@@ -111,7 +111,7 @@ def sigint_handler(sig, frame):
 signal.signal(signal.SIGINT, sigint_handler)
 
 def buttons_thread():
-    global WarmSelected, TempSelectedIndex, HeaterActivated
+    global WarmSelected, TempSelectedIndex, HeaterActivated, ChildLockActivated
     def toggle_warm():
         global WarmSelected
         GPIO.output(LED1, GPIO.LOW)
@@ -147,9 +147,13 @@ def buttons_thread():
             GPIO.output(Heater, GPIO.LOW)
         elif CurTemperature <= (TempSelectedOptions[TempSelectedIndex] - 5) and HeaterActivated == GPIO.LOW:
             GPIO.output(Heater, GPIO.HIGH)
-            
+    
+    def toggle_childlock():
+        global ChildLockActivated
+        ChildLockActivated = not ChildLockActivated
+    
     warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_warm)
-    hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot, long_press_callback=lambda: ChildLockActivated = not ChildLockActivated)
+    hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot, long_press_callback=toggle_childlock)
     temp_lock_button = ButtonHandler(Button7, Buzzer2, Buzzer2, 1.5, long_press_callback=lambda: GPIO.output(LED3, not GPIO.input(LED3)))
 
     increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_press_callback=increase_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
@@ -175,7 +179,7 @@ def buttons_thread():
         GPIO.cleanup();
 
 def serial_reader_thread():
-    global ContainerCap, Mode, CurTemperature, IsPushed
+    global ContainerCap, Mode, CurTemperature, IsPushed, ChildLockActivated, HeaterActivated
     try:
         with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1) as ser:
             print(f"Listening on {SERIAL_PORT} at {BAUD_RATE} baud...")
@@ -185,14 +189,17 @@ def serial_reader_thread():
                     try:
                         # Parse the CSV format
                         parts = line.split(',')
+                        ser.write(f"0,{TempSelectedOptions[TempSelectedIndex]},{1 if HeaterActivated else 0},{1 if ChildLockActivated else 0 }\n".encode('utf-8'))
                         
-                        if len(parts) == 4:
-                            ContainerCap = int(parts[0])
-                            Mode = int(parts[1])
-                            CurTemperature = int(parts[2])
-                            IsPushed = int(parts[3])
+                        if len(parts) == 5:
+                            Receivable = int(parts[0])
+                            if Receivable == 0: continue # IGNORE some data that should not be received.
+                            ContainerCap = int(parts[1])
+                            Mode = int(parts[2])
+                            CurTemperature = int(parts[3])
+                            IsPushed = int(parts[4])
                             print(f"Parsed data: ContainerCap={ContainerCap}, Mode={Mode}, "
-                                  f"CurTemperature={CurTemperature}, IsPushed={IsPushed}, Heater={HeaterActivated}, SelTemp={TempSelectedOptions[TempSelectedIndex]}°C")
+                                  f"CurTemperature={CurTemperature}, IsPushed={IsPushed}, Heater={HeaterActivated}, SelTemp={TempSelectedOptions[TempSelectedIndex]}-C, Child={ChildLockActivated}")
                         else:
                             print(f"Unexpected data format: {line}")
                     except ValueError:
