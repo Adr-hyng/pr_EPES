@@ -72,9 +72,11 @@ ContainerCap = 0
 Mode = 2
 CurTemperature = 0
 IsPushed = False
-WarmSelected = True
+WarmSelected = True 
 TempSelectedIndex = 0
-TempSelectedOptions = [50, 60, 70]  # Send the selected Temperaturet to ESP32 - TODO
+TempSelectedOptions = [65, 75, 85]  # Send the selected Temperaturet to ESP32 - TODO
+ChildLockActivated = False # Send to ESP32
+HeaterActivated = False # Send to ESP32
 
 show_camera = True
 
@@ -109,7 +111,7 @@ def sigint_handler(sig, frame):
 signal.signal(signal.SIGINT, sigint_handler)
 
 def buttons_thread():
-    global WarmSelected, TempSelectedIndex
+    global WarmSelected, TempSelectedIndex, HeaterActivated
     def toggle_warm():
         global WarmSelected
         GPIO.output(LED1, GPIO.LOW)
@@ -139,13 +141,15 @@ def buttons_thread():
         TempSelectedIndex -= 1
         
     def electric_heater_system():
-        if (CurTemperature >= TempSelectedOptions[TempSelectedIndex] and GPIO.input(Heater) == GPIO.HIGH):
+        global HeaterActivated
+        HeaterActivated = GPIO.input(Heater)
+        if (CurTemperature >= TempSelectedOptions[TempSelectedIndex] and HeaterActivated == GPIO.HIGH):
             GPIO.output(Heater, GPIO.LOW)
-        elif CurTemperature <= (TempSelectedOptions[TempSelectedIndex] - 5) and GPIO.input(Heater) == GPIO.LOW:
+        elif CurTemperature <= (TempSelectedOptions[TempSelectedIndex] - 5) and HeaterActivated == GPIO.LOW:
             GPIO.output(Heater, GPIO.HIGH)
             
     warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_warm)
-    hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot)
+    hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot, long_press_callback=lambda: ChildLockActivated = not ChildLockActivated)
     temp_lock_button = ButtonHandler(Button7, Buzzer2, Buzzer2, 1.5, long_press_callback=lambda: GPIO.output(LED3, not GPIO.input(LED3)))
 
     increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_press_callback=increase_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
@@ -188,7 +192,7 @@ def serial_reader_thread():
                             CurTemperature = int(parts[2])
                             IsPushed = int(parts[3])
                             print(f"Parsed data: ContainerCap={ContainerCap}, Mode={Mode}, "
-                                  f"CurTemperature={CurTemperature}, IsPushed={IsPushed}, Heater={GPIO.input(Heater)}, SelTemp={TempSelectedOptions[TempSelectedIndex]} degree C")
+                                  f"CurTemperature={CurTemperature}, IsPushed={IsPushed}, Heater={HeaterActivated}, SelTemp={TempSelectedOptions[TempSelectedIndex]}°C")
                         else:
                             print(f"Unexpected data format: {line}")
                     except ValueError:
@@ -212,6 +216,7 @@ def run_pump_thread(state):
     if state and not is_pouring:
         # Turn on the pump
         print("Turning pump ON - ", selected_dispenser())
+        if sel_disp_pin == HotWater and ChildLockActivated: return
         GPIO.output(sel_disp_pin, GPIO.HIGH)
         is_pouring = True
     elif not state and is_pouring:
