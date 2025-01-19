@@ -78,6 +78,8 @@ TempSelectedOptions = [65, 75, 85]  # Send the selected Temperaturet to ESP32 - 
 ChildLockActivated = False # Send to ESP32
 HeaterActivated = False # Send to ESP32
 
+ResetMode = 0
+
 show_camera = True
 
 def selected_dispenser():
@@ -111,19 +113,19 @@ def sigint_handler(sig, frame):
 signal.signal(signal.SIGINT, sigint_handler)
 
 def buttons_thread():
-    global WarmSelected, TempSelectedIndex, HeaterActivated, ChildLockActivated
+    global WarmSelected, TempSelectedIndex, HeaterActivated, ChildLockActivated, ResetMode
     def toggle_warm():
         global WarmSelected
-        GPIO.output(LED1, GPIO.LOW)
-        GPIO.output(LED2, GPIO.HIGH)
+        GPIO.output(LED2, GPIO.LOW)
+        GPIO.output(LED1, GPIO.HIGH)
         WarmSelected = True
         GPIO.output(WarmWater, GPIO.LOW)
         GPIO.output(HotWater, GPIO.LOW)
             
     def toggle_hot():
         global WarmSelected
-        GPIO.output(LED2, GPIO.LOW)
-        GPIO.output(LED1, GPIO.HIGH)
+        GPIO.output(LED1, GPIO.LOW)
+        GPIO.output(LED2, GPIO.HIGH)
         WarmSelected = False
         GPIO.output(WarmWater, GPIO.LOW)
         GPIO.output(HotWater, GPIO.LOW)
@@ -151,6 +153,11 @@ def buttons_thread():
     def toggle_childlock():
         global ChildLockActivated
         ChildLockActivated = not ChildLockActivated
+        
+    def pressed_reset():
+        global ResetMode
+        ResetMode = 1;
+        print("RESET MODE = ", ResetMode)
     
     warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_warm)
     hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot, long_press_callback=toggle_childlock)
@@ -159,7 +166,7 @@ def buttons_thread():
     increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_press_callback=increase_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
     decrease_button = ButtonHandler(Button3, Buzzer1, -1, 60, short_press_callback=decrease_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
     get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60)
-    get_temperature_button = ButtonHandler(Button2, Buzzer1, -1, 60)
+    get_temperature_button = ButtonHandler(Button2, Buzzer1, Buzzer1, 3, long_press_callback=pressed_reset)
     
     try:
         while True:
@@ -179,18 +186,19 @@ def buttons_thread():
         GPIO.cleanup();
 
 def serial_reader_thread():
-    global ContainerCap, Mode, CurTemperature, IsPushed, ChildLockActivated, HeaterActivated
+    global ContainerCap, Mode, CurTemperature, IsPushed, ChildLockActivated, HeaterActivated, ResetMode
     try:
         with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1) as ser:
             print(f"Listening on {SERIAL_PORT} at {BAUD_RATE} baud...")
+            
+            ResetMode = 1
             while True:
                 line = ser.readline().decode('utf-8').strip()
                 if line:
                     try:
                         # Parse the CSV format
                         parts = line.split(',')
-                        ser.write(f"0,{TempSelectedOptions[TempSelectedIndex]},{1 if HeaterActivated else 0},{1 if ChildLockActivated else 0 }\n".encode('utf-8'))
-                        
+                        ser.write(f"0,{TempSelectedOptions[TempSelectedIndex]},{1 if HeaterActivated else 0},{1 if ChildLockActivated else 0 },{ResetMode}\n".encode('utf-8'))
                         if len(parts) == 5:
                             Receivable = int(parts[0])
                             if Receivable == 0: continue # IGNORE some data that should not be received.
@@ -199,9 +207,10 @@ def serial_reader_thread():
                             CurTemperature = int(parts[3])
                             IsPushed = int(parts[4])
                             print(f"Parsed data: ContainerCap={ContainerCap}, Mode={Mode}, "
-                                  f"CurTemperature={CurTemperature}, IsPushed={IsPushed}, Heater={HeaterActivated}, SelTemp={TempSelectedOptions[TempSelectedIndex]}-C, Child={ChildLockActivated}")
+                                  f"CurTemperature={CurTemperature}, IsPushed={IsPushed}, Reset={ResetMode}")
                         else:
                             print(f"Unexpected data format: {line}")
+                        if ResetMode: ResetMode = 0
                     except ValueError:
                         print(f"Failed to parse: {line}")
     except serial.SerialException as e:

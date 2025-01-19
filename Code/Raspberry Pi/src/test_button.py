@@ -78,10 +78,10 @@ GPIO.output(LED3, GPIO.LOW)
 
 try:
     while True:
-        GPIO.output(Heater, GPIO.HIGH);
-        sleep(3)
-        GPIO.output(Heater, GPIO.LOW);
-        sleep(3)
+        GPIO.output(HotWater, GPIO.HIGH);
+        sleep(2)
+        GPIO.output(HotWater, GPIO.LOW);
+        sleep(4)
 #        if(GPIO.input(Button4)) == GPIO.HIGH:
 #            GPIO.output(idk2, GPIO.HIGH)
 #        else:
