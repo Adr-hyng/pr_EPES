@@ -33,6 +33,7 @@ const int buzzerPin = 5;
 //<Save_References !Start!>
 gslc_tsElemRef* m_pElemOutTxt3    = NULL;
 gslc_tsElemRef* m_pElemXRingGauge1= NULL;
+gslc_tsElemRef* m_pElemChildLock= NULL;
 //<Save_References !End!>
 
 // Define debug message function
@@ -46,7 +47,6 @@ void sendData()
   // Set values to send
   myData.ContainerCap = myData.ContainerCap;
   myData.Mode = load_from_nvs(NVS_KEY_MODE, 0);
-  myData.CLstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
 
   m_pElemOutTxt3 = gslc_PageFindElemById(&m_gui, gslc_GetPageCur(&m_gui), ContainerCap);
   // Update the GUI element text
@@ -88,20 +88,23 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   Serial.println(myData.ContainerCap);
   Serial.print("Mode: ");
   Serial.println(myData.Mode);
-  Serial.print("Child-Lock: ");
-  Serial.println(myData.CLstate);
-  Serial.print("Heater: ");
-  Serial.println(myData.Hstate);
-  Serial.print("Temperature Lock: ");
-  Serial.println(myData.TLstate);
   Serial.print("Current Temp.: ");
   Serial.println(myData.CurTemperature);
-  Serial.print("Selected Max Temp: ");
-  Serial.println(myData.SelTemp_MRange);
+  Serial.print("Child-Lock: ");
+  Serial.println(myData.childLockActivated);
   Serial.println();
+
+  m_pElemChildLock = gslc_PageFindElemById(&m_gui, gslc_GetPageCur(&m_gui), ChildLockIndicator);
+  gslc_ElemSetGlowEn(&m_gui, m_pElemChildLock, myData.childLockActivated);
+  gslc_ElemSetGlow(&m_gui, m_pElemChildLock, myData.childLockActivated);
 
   static char TContainerCap[4] = ""; // Ensure TContainerCap is properly declared
   snprintf(TContainerCap, sizeof(TContainerCap), "%d", myData.ContainerCap);
+  if(myData.isStablized) {
+    gslc_ElemXRingGaugeSetColorActiveFlat(&m_gui, m_pElemXRingGauge1, gslc_tsColor(0, 255, 0));
+  } else {
+    gslc_ElemXRingGaugeSetColorActiveFlat(&m_gui, m_pElemXRingGauge1, gslc_tsColor(255, 255, 255));
+  }
   // Update the GUI element
   gslc_ElemSetTxtStr(&m_gui, m_pElemOutTxt3, TContainerCap);
   gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
@@ -157,6 +160,11 @@ int load_from_nvs(const char* key, int default_value)
     return (int)value; // Cast back to int if necessary
 }
 
+void beepBuzzer(unsigned long duration = 50) {
+  digitalWrite(buzzerPin, HIGH);
+  delay(duration);
+  digitalWrite(buzzerPin, LOW);
+}
 
 // Retoggle Buttons
 void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem)
@@ -181,13 +189,9 @@ void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem)
         gslc_ElemSetGlow(pGui, pElemRef, g_ButtonFlags[i]);
         i++;
     }
+    beepBuzzer(100);
+    sendData();
 }
-void beepBuzzer(unsigned long duration = 50) {
-  digitalWrite(buzzerPin, HIGH);
-  delay(duration);
-  digitalWrite(buzzerPin, LOW);
-}
-
 // Common Button callback
 bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY)
 {
@@ -204,13 +208,11 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
       case AutoBtn:
         util_validBtnFlag = true;
         save_to_nvs(NVS_KEY_MODE, 2); // Auto Mode
-        // beepBuzzer(50);
         Serial.print("AUTO PRESSED");
         break;
       case SafeBtn:
         util_validBtnFlag = true;
         save_to_nvs(NVS_KEY_MODE, 1); // Safe Mode
-        // save_to_nvs(NVS_KEY_LOCK_MODE, 0); // Traditional Mode
         Serial.print("SAFE PRESSED");
         break;
       case TradBtn:

@@ -24,7 +24,6 @@
 // NVS namespace and key for storing the mode
 #define NVS_NAMESPACE "storage"
 #define NVS_KEY_MODE "last_mode"
-#define NVS_KEY_LOCK_MODE "lock_state"
 
 // Include any extended elements
 //<Includes !Start!>
@@ -108,15 +107,15 @@ gslc_tsXRingGauge               m_sXRingGauge1;
 bool g_ButtonFlags[3] = {false, false, true}; // Glowing buttons
 // Must match the receiver structure
 typedef struct struct_message {
-  short ContainerCap; // water jug capacity
-  short Mode; // 0-2
-  short CLstate; // child lock
-  short Hstate; // heater state
-  short TLstate; // temp lock
-  short CurTemperature; // current temperature
-  short SelTemp_MRange; // selected temperature range
-  bool isPushed; // analog joystick is pushed
-} struct_message; 
+  short ContainerCap; // Send to Raspberry Pi
+  short Mode; // Send to Raspberry Pi
+  short CurTemperature; // Send to Raspberry Pi
+  bool isPushed; // Send to Raspberry Pi
+  short SelTemp_MRange;
+  bool heaterActivated;
+  bool isStablized;
+  bool childLockActivated;
+} struct_message;
 // ------------------------------------------------
 
 // Element References for direct access
@@ -164,7 +163,6 @@ void InitGUIslice_gen()
 
   // Load the last mode from NVS
   int last_mode = load_from_nvs(NVS_KEY_MODE, 1);
-  int last_lock_state = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
 
   // ------------------------------------------------
   // Load Fonts1
@@ -276,11 +274,6 @@ void InitGUIslice_gen()
       gslc_ElemSetGlow(&m_gui, pElemRef2, true);
   }
 
-  if(last_lock_state) {
-    gslc_tsElemRef* pElemRef2 = gslc_PageFindElemById(&m_gui, E_PG_MAIN, ChildLockIndicator);
-    gslc_ElemSetGlowEn(&m_gui, pElemRef2, true);
-    gslc_ElemSetGlow(&m_gui, pElemRef2, true);
-  }
   gslc_GuiRotate(&m_gui, 0);
 
 //<Startup !End!>

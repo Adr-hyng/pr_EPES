@@ -22,21 +22,72 @@
 #include "HX711.h"
 #include <vector>
 #include <math.h>
+#include <functional>
 
 // ------------------------------------------------
 // Program Globals
+#include <functional>
+
+class Timer {
+public:
+  Timer(unsigned long interval, std::function<void()> callback)
+    : interval(interval), callback(callback), lastExecutionTime(0) {}
+
+  void check() {
+    unsigned long currentMillis = millis();
+    if (currentMillis - lastExecutionTime >= interval) {
+      lastExecutionTime = currentMillis;
+      callback();
+    }
+  }
+
+private:
+  unsigned long interval;
+  std::function<void()> callback;
+  unsigned long lastExecutionTime;
+};
+
+class RunTimeout {
+public:
+  RunTimeout(unsigned long timeout, std::function<void()> callback)
+    : timeout(timeout), callback(callback), startTime(millis()), executed(false) {}
+
+  void check() {
+    if (!executed && millis() - startTime >= timeout) {
+      executed = true;
+      callback();
+    }
+  }
+
+  void reset(unsigned long newTimeout = 0) {
+    startTime = millis();
+    executed = false;
+    if (newTimeout > 0) {
+      timeout = newTimeout;
+    }
+  }
+
+private:
+  unsigned long timeout;
+  std::function<void()> callback;
+  unsigned long startTime;
+  bool executed;
+};
+
+
+
 // Must match the sender structure
 uint8_t broadcastAddress[] = {0x34, 0x5f, 0x45, 0xa9, 0xc1, 0x08}; // New ESP
 esp_now_peer_info_t peerInfo;
 typedef struct struct_message {
-  short ContainerCap;
-  short Mode;
-  short CLstate; // child lock
-  short Hstate; // heat lock
-  short TLstate; // temp lock
-  short CurTemperature;
+  short ContainerCap; // Send to Raspberry Pi
+  short Mode; // Send to Raspberry Pi
+  short CurTemperature; // Send to Raspberry Pi
+  bool isPushed; // Send to Raspberry Pi
   short SelTemp_MRange;
-  bool isPushed;
+  bool heaterActivated;
+  bool isStablized;
+  bool childLockActivated;
 } struct_message;
 struct_message myData;
 bool redrawRequired = false;
@@ -63,6 +114,7 @@ gslc_tsElemRef* m_pElemOutCurTemp = NULL;
 gslc_tsElemRef* m_pElemOutSelTemp = NULL;
 gslc_tsElemRef* m_pElemOutThermometerIMG= NULL;
 gslc_tsElemRef* m_pElemXRingGauge1= NULL;
+gslc_tsElemRef* m_pElemHeaterState= NULL;
 //<Save_References !End!>
 
 // Define debug message function
@@ -76,9 +128,23 @@ void initializeScale() {
   scale.set_scale(calibrationFactor);
   scale.tare();
 }
+void execEveryMillis(unsigned long interval, std::function<void()> callback) {
+  static unsigned long lastExecutionTime = 0;
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastExecutionTime >= interval) {
+    lastExecutionTime = currentMillis;
+    callback();
+  }
+}
+RunTimeout goBackToDefault(2000, []() {
+  gslc_ElemXRingGaugeSetColorActiveFlat(&m_gui, m_pElemXRingGauge1, gslc_tsColor(255, 255, 255));
+  myData.isStablized = false;
+});
 // Function to handle weight reading, stabilization, and lifting
 void handleWeightMeasurement(float& targetWeight, bool& isStabilized, float weightReduction = 0.05, float stabilizationThreshold = 0.3, int maxReadings = 20) {
   static std::vector<float> weightReadings;
+  float initialVal = -1;
   
   if (scale.is_ready()) {
     float weight = scale.get_units(10); // Average of 10 readings
@@ -95,25 +161,37 @@ void handleWeightMeasurement(float& targetWeight, bool& isStabilized, float weig
       float stddev = calculateStdDev(weightReadings, mean);
 
       if (!isStabilized && stddev < stabilizationThreshold) {
+        // Turn green the gauge
         isStabilized = true;
-        Serial.println("Stabilization complete.");
+        // Serial.println("Stabilization complete.");
+        gslc_ElemXRingGaugeSetColorActiveFlat(&m_gui, m_pElemXRingGauge1, gslc_tsColor(0, 255, 0));
+        myData.isStablized = true;
+        
       } else if (isStabilized && stddev >= stabilizationThreshold) {
+        goBackToDefault.check();
         targetWeight -= weightReduction; // Adjust target weight
-        Serial.print("Lifting... Target Weight: ");
-        Serial.print(targetWeight, 2);
-        Serial.println(" g");
+        // Serial.print("Lifting... Target Weight: ");
+        // Serial.print(targetWeight, 2);
+        // Serial.println(" g");
+        myData.isStablized = false;
+        myData.ContainerCap = targetWeight;
       }
 
-      // Display results
-      Serial.print("Current Weight: ");
-      Serial.print(weight, 2);
-      Serial.println(" g");
-      Serial.print("Mean: ");
-      Serial.print(mean, 2);
-      Serial.println(" g");
-      Serial.print("Standard Deviation: ");
-      Serial.print(stddev, 2);
-      Serial.println(" g");
+      if(!(initialVal >= mean - 50) && isStabilized) { // is Empty and stablized 
+      // Not working
+        targetWeight = 0;
+      }
+
+      // // Display results
+      // Serial.print("Initial Weight: ");
+      // Serial.print(initialVal, 2);
+      // Serial.println(" g");
+      // Serial.print("Mean: ");
+      // Serial.print(mean, 2);
+      // Serial.println(" g");
+      // Serial.print("Standard Deviation: ");
+      // Serial.print(stddev, 2);
+      // Serial.println(" g");
     }
   } else {
     Serial.println("HX711 not found. Check connections.");
@@ -140,82 +218,71 @@ void sendData()
 {
   // Set values to send
   myData.Mode = myData.Mode;
-  // myData.CLstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
-  // myData.Hstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
-  // myData.TLstate = load_from_nvs(NVS_KEY_LOCK_MODE, 0);
-  sensors.requestTemperatures(); 
-  myData.CurTemperature = sensors.getTempCByIndex(0);
-
-  myData.SelTemp_MRange = random(50, 75);
-
-
-  int y_adc_val; 
-  float y_volt;
-  y_adc_val = analogRead(joystick_y_pin);
-  y_volt = ( (y_adc_val * 3.3 ) / 4095 );  /*Convert digital value to voltage */
-  myData.isPushed = y_volt <= 1.3;
-
-  Serial.println(y_volt);
-
-  static float currentWaterCapacity = 100.0;
-  static bool isStabilized = false;
-  handleWeightMeasurement(currentWaterCapacity, isStabilized);
-  myData.ContainerCap = currentWaterCapacity;
-  
-  static char TCurTemp[4] = ""; // Ensure TCurTemp is properly declared
-  snprintf(TCurTemp, sizeof(TCurTemp), "%d", myData.CurTemperature);
-  if (m_pElemOutCurTemp != NULL) {
-    gslc_ElemSetTxtStr(&m_gui, m_pElemOutCurTemp, TCurTemp);
-    // gslc_ElemSetRedraw(&m_gui, m_pElemOutCurTemp, GSLC_REDRAW_FULL);
-  } else {
-      Serial.println("Error: m_pElemOutCurTemp is NULL");
-  }
-  // redrawRequired = true;
+  myData.childLockActivated = myData.childLockActivated;
 
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&myData, sizeof(myData));
   gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
-  if (result == ESP_OK) {
-    Serial.println("Sent with success");
-  } else {
-    Serial.println("Error sending the data");
-  }
+  // if (result == ESP_OK) {
+  //   Serial.println("Sent with success");
+  // } else {
+  //   Serial.println("Error sending the data");
+  // }
 }
 // callback function that will be executed when data is received
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   memcpy(&myData, incomingData, sizeof(myData));
-  Serial.print("Bytes received: ");
-  Serial.println(len);
-  Serial.print("Capacity: ");
-  Serial.println(myData.ContainerCap);
-  Serial.print("Mode: ");
-  Serial.println(myData.Mode);
-  Serial.print("Child-Lock: ");
-  Serial.println(myData.CLstate);
-  Serial.print("Heater: ");
-  Serial.println(myData.Hstate);
-  Serial.print("Temperature Lock: ");
-  Serial.println(myData.TLstate);
-  Serial.print("Current Temp.: ");
-  Serial.println(myData.CurTemperature);
-  Serial.print("Selected Max Temp: ");
-  Serial.println(myData.SelTemp_MRange);
-  Serial.println();
-
+  // Serial.print("Bytes received: ");
+  // Serial.println(len);
+  // Serial.print("Capacity: ");
+  // Serial.println(myData.ContainerCap);
+  // Serial.print("Mode: ");
+  // Serial.println(myData.Mode);
+  // Serial.print("Current Temp.: ");
+  // Serial.println(myData.CurTemperature);
+  // Serial.println();
+  
   gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
   static char TCurTemp[4] = ""; // Ensure TCurTemp is properly declared
   snprintf(TCurTemp, sizeof(TCurTemp), "%d", myData.CurTemperature);
   if (m_pElemOutCurTemp != NULL) {
     gslc_ElemSetTxtStr(&m_gui, m_pElemOutCurTemp, TCurTemp);
     // gslc_ElemSetRedraw(&m_gui, m_pElemOutCurTemp, GSLC_REDRAW_FULL);
-  } else {
-      Serial.println("Error: m_pElemOutCurTemp is NULL");
-  }
+  } 
+  // else {
+  //     Serial.println("Error: m_pElemOutCurTemp is NULL");
+  // }
   redrawRequired = true;
 }
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 {
-  Serial.print("\r\nLast Packet Send Status:\t");
-  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+  // Serial.print("\r\nLast Packet Send Status:\t");
+  // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+  return;
+}
+bool onStateChange(bool& currentState, bool newValue) {
+  static bool previousState = false;
+  if (currentState != newValue) {
+    previousState = currentState;
+    currentState = newValue;
+    return true; // Change detected
+  }
+  return false; // No change
+}
+void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigned short* newBitmap) 
+{
+    if (pElemRef == nullptr) {
+        return; // Element reference is invalid
+    }
+
+    // Clear the element's background
+    // gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FOCUS);
+
+    // Update the image reference
+    gslc_tsImgRef updImgRef = gslc_GetImageFromProg((const unsigned char*)newBitmap, GSLC_IMGREF_FMT_BMP24);
+    gslc_ElemSetImage(pGui, pElemRef, updImgRef, updImgRef);
+
+    // Trigger a redraw of the element to display the new image
+    gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FOCUS);
 }
 // Common Button callback
 bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY)
@@ -238,16 +305,6 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
   }
   return true;
 }
-void execEveryMillis(unsigned long interval, void (*callback)())
-{
-  static unsigned long lastExecutionTime = 0;
-  unsigned long currentMillis = millis();
-  
-  if (currentMillis - lastExecutionTime >= interval) {
-    lastExecutionTime = currentMillis;
-    callback();
-  }
-}
 //<Checkbox Callback !Start!>
 //<Checkbox Callback !End!>
 //<Keypad Callback !Start!>
@@ -265,9 +322,10 @@ void execEveryMillis(unsigned long interval, void (*callback)())
 
 void setup()
 {
-  // ------------------------------------------------
+  // ----------------------4--------------------------
   // Initialize
   // ------------------------------------------------
+  myData.ContainerCap = 0;
   Serial.begin(115200);
   sensors.begin();
   initializeScale();
@@ -286,7 +344,7 @@ void setup()
 
   // Init ESP-NOW
   if (esp_now_init() != ESP_OK) {
-    Serial.println("Error initializing ESP-NOW");
+    // Serial.println("Error initializing ESP-NOW")
     return;
   }
   // Once ESPNow is successfully Init, we will register for Send CB to
@@ -303,20 +361,94 @@ void setup()
 
   // Add peer        
   if (esp_now_add_peer(&peerInfo) != ESP_OK){
-    Serial.println("Failed to add peer");
+    // Serial.println("Failed to add peer");
     return;
   }
 }
+
+Timer timer1(500, []() {
+  static float currentWaterCapacity = 50.0;
+  static bool isStabilized = false;
+  handleWeightMeasurement(currentWaterCapacity, isStabilized, 0.2);
+  Serial.print(1);
+  Serial.print(",");
+  Serial.print(myData.ContainerCap);
+  Serial.print(",");
+  Serial.print(myData.Mode);
+  Serial.print(",");
+  Serial.print(myData.CurTemperature);
+  Serial.print(",");
+  Serial.print(myData.isPushed);
+  Serial.println();
+});
+
+Timer timer2(100, []() {
+  int y_adc_val; 
+  float y_volt;
+  y_adc_val = analogRead(joystick_y_pin);
+  y_volt = ( (y_adc_val * 3.3 ) / 4095 );  /*Convert digital value to voltage */
+  myData.isPushed = (y_volt <= 1.3 && y_volt >= 0.6) || y_volt <= 0.4;
+});
+Timer timer3(10000, []() {
+  sensors.requestTemperatures(); 
+  myData.CurTemperature = sensors.getTempCByIndex(0);
+  static char TCurTemp[4] = ""; // Ensure TCurTemp is properly declared
+  snprintf(TCurTemp, sizeof(TCurTemp), "%d", myData.CurTemperature);
+  if (m_pElemOutCurTemp != NULL) {
+    gslc_ElemSetTxtStr(&m_gui, m_pElemOutCurTemp, TCurTemp);
+  } 
+  // redrawRequired = true;
+});
+
+Timer timer4(1000, []() {
+  sendData();
+});
 
 // -----------------------------------
 // Main event loop
 // -----------------------------------
 void loop()
 {
-
   // ------------------------------------------------
+  if (Serial.available() > 0) { // Check if data is available
+    String receivedData = Serial.readStringUntil('\n'); // Read until newline
+    // Parse the data
+    int dummy; // Placeholder for the first value (0)
+    int tempSelTemp_MRange, tempHeaterActivated, tempChildLockActivated; // Temporary variables for parsing
+    int parsedValues = sscanf(receivedData.c_str(), "%d,%d,%d,%d",
+                               &dummy,
+                               &tempSelTemp_MRange,
+                               &tempHeaterActivated,
+                               &tempChildLockActivated);
 
-  execEveryMillis(1000, sendData);
+    if (parsedValues == 4) { // Ensure all 4 values were parsed successfully
+      if (dummy == 0) { // Only assign values if dummy is 0
+        myData.SelTemp_MRange = tempSelTemp_MRange;
+
+        if(myData.SelTemp_MRange == 85) {
+          UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER);
+        } else if(myData.SelTemp_MRange == 75) {
+          UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER_1);
+        } else {
+          UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER_2);
+        }
+
+        if(onStateChange(myData.heaterActivated, tempHeaterActivated)) {
+          m_pElemHeaterState = gslc_PageFindElemById(&m_gui, gslc_GetPageCur(&m_gui), HeaterIndicator);
+          gslc_ElemSetGlowEn(&m_gui, m_pElemHeaterState, myData.heaterActivated);
+          gslc_ElemSetGlow(&m_gui, m_pElemHeaterState, myData.heaterActivated);
+        }
+
+        if (onStateChange(myData.childLockActivated, tempChildLockActivated)) {
+          sendData();
+        }
+      }
+    }
+  }
+  timer1.check();
+  timer2.check();
+  timer3.check();
+  timer4.check();
 
   // Update GUI Elements
   if (redrawRequired) {
