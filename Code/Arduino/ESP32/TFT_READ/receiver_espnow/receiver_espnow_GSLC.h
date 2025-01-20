@@ -45,6 +45,8 @@ extern "C" const unsigned short DROPLET_ICON[] PROGMEM;
 extern "C" const unsigned short HEATER_GLOW[] PROGMEM;
 extern "C" const unsigned short HEATER_NORMALIZE[] PROGMEM;
 extern "C" const unsigned short THERMOMETER[] PROGMEM;
+extern "C" const unsigned short THERMOMETER_1[] PROGMEM;
+extern "C" const unsigned short THERMOMETER_2[] PROGMEM;
 //<Resources !End!>
 
 // ------------------------------------------------
@@ -181,7 +183,7 @@ void InitGUIslice_gen()
   gslc_ElemSetGlowEn(&m_gui, pElemRef, false);
   
   // Create CurTemperature runtime modifiable text
-  static char m_sDisplayText3[4] = "5";
+  static char m_sDisplayText3[4] = "0";
   pElemRef = gslc_ElemCreateTxt(&m_gui,CurTemperature,E_PG_MAIN,(gslc_tsRect){125,15,54,24},
     (char*)m_sDisplayText3,4,E_BUILTIN15X24);
   gslc_ElemSetTxtAlign(&m_gui,pElemRef,GSLC_ALIGN_MID_RIGHT);

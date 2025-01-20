@@ -13,7 +13,8 @@ class ButtonHandler:
         short_press_callback=None, 
         long_press_callback=None,
         short_output_condition=lambda: True,  # Default to always execute
-        long_output_condition=lambda: True   # Default to always execute
+        long_output_condition=lambda: True,  # Default to always execute
+        pull_mode="PULLDOWN"  # PULLDOWN or PULLUP
     ):
         self.button_pin = button_pin
         self.led_pin_short = output_pin_short
@@ -23,6 +24,7 @@ class ButtonHandler:
         self.long_press_callback = long_press_callback
         self.short_output_condition = short_output_condition
         self.long_output_condition = long_output_condition
+        self.pull_mode = pull_mode.upper()
 
         self.press_start_time = 0
         self.button_state = False
@@ -34,7 +36,13 @@ class ButtonHandler:
         self.long_blink_timer = 0
 
         # Setup GPIO
-        GPIO.setup(self.button_pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+        if self.pull_mode == "PULLDOWN":
+            GPIO.setup(self.button_pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+        elif self.pull_mode == "PULLUP":
+            GPIO.setup(self.button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        else:
+            raise ValueError("Invalid pull_mode. Use 'PULLDOWN' or 'PULLUP'.")
+
         GPIO.setup(self.led_pin_short, GPIO.OUT)
 
         if self.led_pin_long != -1:  # Only setup if valid
@@ -42,7 +50,11 @@ class ButtonHandler:
 
     def update(self, current_time):
         """Update the button state and handle actions."""
-        self.button_state = GPIO.input(self.button_pin) == GPIO.HIGH
+        # Determine active state based on pull mode
+        if self.pull_mode == "PULLDOWN":
+            self.button_state = GPIO.input(self.button_pin) == GPIO.HIGH
+        elif self.pull_mode == "PULLUP":
+            self.button_state = GPIO.input(self.button_pin) == GPIO.LOW
 
         if self.button_state and not self.last_button_state:
             # Button just pressed
@@ -102,3 +114,4 @@ class ButtonHandler:
                     self.long_blink_stage = 0  # Blink sequence completed
 
         self.last_button_state = self.button_state  # Update last button state
+

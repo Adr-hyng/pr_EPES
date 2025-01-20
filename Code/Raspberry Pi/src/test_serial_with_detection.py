@@ -28,16 +28,16 @@ SERIAL_PORT = '/dev/ttyUSB0'  # Adjust based on your setup
 BAUD_RATE = 115200
 
 #Button Pins
-Button1 = 0 # Get Water Jug Capacity
-Button2 = 1 # Get Temperature
-Button3 = 27 # Decrease
-Button4 = 22 # Increase
+Button1 = 14 # Get Water Jug Capacity
+Button2 = 4 # Get Temperature
+Button3 = 2 # Decrease
+Button4 = 3 # Increase
 Button5 = 25 # hot
-Button6 = 21 # warm
+Button6 = 22 # warm
 Button7 = 9 # temp Lock
 LED1 = 20
-LED2 = 11
-LED3 = 8
+LED2 = 21
+LED3 = 27
 Buzzer1 = 6
 Buzzer2 = 13
 HotWater = 26
@@ -62,8 +62,8 @@ GPIO.output(LED3, GPIO.LOW)
 
 
 detection_timestamps = []  # List to store timestamps of detections
-min_detections = 1  # 20 = 500
-frequency_millis = 100 # Number of milliseconds to detect it is consistent container.
+min_detections = 10  # 20 = 500
+frequency_millis = 1000 # Number of milliseconds to detect it is consistent container.
 box_rect_size = 18
 
 # Shared flag for joystick status
@@ -76,10 +76,10 @@ WarmSelected = True
 ChildLockActivated = False
 TempSelectedIndex = 0
 TempSelectedOptions = [65, 75, 85]  # Send the selected Temperaturet to ESP32 - TODO
-
 HeaterActivated = False # Send to ESP32
-
 ResetMode = 0
+
+STATE_FILE = "state.json"
 
 show_camera = True
 
@@ -107,11 +107,34 @@ def get_webcams():
 
 def sigint_handler(sig, frame):
     print('Interrupted')
+    save_state()
     if runner:
         runner.stop()
     sys.exit(0)
 
 signal.signal(signal.SIGINT, sigint_handler)
+
+def save_state():
+    state = {
+        "WarmSelected": WarmSelected,
+        "ChildLockActivated": ChildLockActivated,
+        "TempSelectedIndex": TempSelectedIndex
+    }
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f)
+    print("State saved:", state)
+
+def load_state():
+    global WarmSelected, ChildLockActivated, TempSelectedIndex
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r") as f:
+            state = json.load(f)
+            WarmSelected = state.get("WarmSelected", True)
+            ChildLockActivated = state.get("ChildLockActivated", False)
+            TempSelectedIndex = state.get("TempSelectedIndex", 0)
+        print("State loaded:", state)
+    else:
+        print("State file not found. Using default values.")
 
 def buttons_thread():
     global WarmSelected, TempSelectedIndex, HeaterActivated, ChildLockActivated, ResetMode
@@ -129,33 +152,37 @@ def buttons_thread():
             GPIO.output(LED2, GPIO.LOW)
             if WarmSelected:       
                 print("Warm is selected")     
-                GPIO.output(LED1, GPIO.HIGH)
+                GPIO.output(LED3, GPIO.HIGH)
                 GPIO.output(WarmWater, GPIO.LOW)
                 GPIO.output(HotWater, GPIO.LOW)
             else:
                 print("Warm is not selected")    
-                GPIO.output(LED2, GPIO.HIGH)
+                GPIO.output(LED1, GPIO.HIGH)
                 GPIO.output(WarmWater, GPIO.LOW)
                 GPIO.output(HotWater, GPIO.LOW)
             
     def toggle_hot_water():
         global WarmSelected
         WarmSelected = False
+        save_state()
     def toggle_warm_water():
         global WarmSelected
         WarmSelected = True
+        save_state()
         
     def increase_temp():
         global TempSelectedIndex
         if GPIO.input(LED3) != GPIO.LOW: return;
         if(TempSelectedIndex >= len(TempSelectedOptions) - 1): return;
         TempSelectedIndex += 1
+        save_state()
         
     def decrease_temp():
         global TempSelectedIndex
         if GPIO.input(LED3) != GPIO.LOW: return;
         if(TempSelectedIndex == 0): return;
         TempSelectedIndex -= 1
+        save_state()
         
     def electric_heater_system():
         global HeaterActivated
@@ -168,6 +195,7 @@ def buttons_thread():
     def toggle_childlock():
         global ChildLockActivated
         ChildLockActivated = not ChildLockActivated
+        save_state()
         
     def pressed_reset():
         global ResetMode
@@ -178,10 +206,10 @@ def buttons_thread():
     hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot_water, long_press_callback=toggle_childlock)
     temp_lock_button = ButtonHandler(Button7, Buzzer2, Buzzer2, 1.5, long_press_callback=lambda: GPIO.output(LED3, not GPIO.input(LED3)))
 
-    increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_press_callback=increase_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
-    decrease_button = ButtonHandler(Button3, Buzzer1, -1, 60, short_press_callback=decrease_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW)
-    get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60)
-    get_temperature_button = ButtonHandler(Button2, Buzzer1, Buzzer1, 5, long_press_callback=pressed_reset)
+    increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_press_callback=increase_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW,pull_mode="PULLUP")
+    decrease_button = ButtonHandler(Button3, Buzzer1, -1, 60, short_press_callback=decrease_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW,pull_mode="PULLUP")
+    get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60,pull_mode="PULLUP")
+    get_temperature_button = ButtonHandler(Button2, Buzzer1, Buzzer1, 5, long_press_callback=pressed_reset,pull_mode="PULLUP")
     
     try:
         while True:
@@ -207,7 +235,7 @@ def serial_reader_thread():
         with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1) as ser:
             print(f"Listening on {SERIAL_PORT} at {BAUD_RATE} baud...")
             
-            ResetMode = 1
+            #ResetMode = 1
             while True:
                 line = ser.readline().decode('utf-8').strip()
                 if line:
@@ -226,7 +254,8 @@ def serial_reader_thread():
                                   f"CurTemperature={CurTemperature}, IsPushed={IsPushed}, Reset={ResetMode}")
                         else:
                             print(f"Unexpected data format: {line}")
-                        if ResetMode: ResetMode = 0
+                        if ResetMode: 
+                            ResetMode = 0
                     except ValueError:
                         print(f"Failed to parse: {line}")
     except serial.SerialException as e:
@@ -280,6 +309,7 @@ def check_for_consistent_detections():
 
 def main():
     model = "modelfile.eim"
+    load_state()
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     modelfile = os.path.join(dir_path, model)

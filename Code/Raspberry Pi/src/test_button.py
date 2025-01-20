@@ -10,17 +10,19 @@ GPIO.setmode(GPIO.BCM)
 #Button Pins
 Button_Pin = 14
 
+# Goods:
+# 14, 2, 3
 
-Button1 = 1
-Button2 = 7 # Change to other pin
-Button3 = 27
-Button4 = 22
-Button5 = 25 # warm
-Button6 = 21 # hot
+Button1 = 14 # Goods: 14, 2
+Button2 = 4 # Change to other pin
+Button3 = 2
+Button4 = 3
+Button5 = 25 # Hot
+Button6 = 22 # Warm
 Button7 = 9 # temp Lock
 LED1 = 20
-LED2 = 11
-LED3 = 8
+LED2 = 21
+LED3 = 27
 
 Solenoid1 = 26
 Solenoid2 = 2
@@ -39,10 +41,10 @@ WarmWater = 19
 
 
 #Setup Button and LED
-GPIO.setup(Button1,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
-GPIO.setup(Button2,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
-GPIO.setup(Button3,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
-GPIO.setup(Button4,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(Button1,GPIO.IN,pull_up_down=GPIO.PUD_UP)
+GPIO.setup(Button2,GPIO.IN,pull_up_down=GPIO.PUD_UP)
+GPIO.setup(Button3,GPIO.IN,pull_up_down=GPIO.PUD_UP)
+GPIO.setup(Button4,GPIO.IN,pull_up_down=GPIO.PUD_UP)
 GPIO.setup(Button5,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(Button6,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(Button7,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
@@ -68,25 +70,26 @@ GPIO.setup(Heater,GPIO.OUT)
 #GPIO.output(Solenoid3, GPIO.LOW)
 #GPIO.output(Solenoid4, GPIO.LOW)
 #GPIO.output(Solenoid5, GPIO.LOW)
+
 GPIO.output(WarmWater, GPIO.LOW)
 GPIO.output(HotWater, GPIO.LOW)
 GPIO.output(Heater, GPIO.LOW)
 
-GPIO.output(LED1, GPIO.LOW)
-GPIO.output(LED2, GPIO.LOW)
-GPIO.output(LED3, GPIO.LOW)
+GPIO.output(LED1, GPIO.HIGH) # LOCK
+GPIO.output(LED2, GPIO.HIGH)
+GPIO.output(LED3, GPIO.HIGH) # HOT
 
 try:
     while True:
-        GPIO.output(HotWater, GPIO.HIGH);
-        sleep(2)
-        GPIO.output(HotWater, GPIO.LOW);
-        sleep(4)
+#        GPIO.output(Heater, GPIO.HIGH)
+#        sleep(4)
+#        GPIO.output(Heater, GPIO.LOW)
+#        sleep(4)
 #        if(GPIO.input(Button4)) == GPIO.HIGH:
 #            GPIO.output(idk2, GPIO.HIGH)
 #        else:
 #            GPIO.output(idk2, GPIO.LOW)
-        print(str(GPIO.input(Button1)) + " - "+str(GPIO.input(Button2)) + " - "+str(GPIO.input(Button3)) + " - "+str(GPIO.input(Button4)) + " - " + str(GPIO.input(Button5)) + " - " + str(GPIO.input(Button6)) + " - " + str(GPIO.input(Button7)))
+        print(str(GPIO.input(Button1)) + " - "+str(GPIO.input(Button2)) + " - "+str(GPIO.input(Button3)) + " - "+str(GPIO.input(Button4)) + " - " + str(int(not GPIO.input(Button5))) + " - " + str(int(not GPIO.input(Button6))) + " - " + str(int(not GPIO.input(Button7))))
 #        print(str(GPIO.input(Button5)) + " - " + str(GPIO.input(Button6)) + " - " + str(GPIO.input(Button7)))
 
         #print("Button 5 = " + str(GPIO.input(Button5)))
