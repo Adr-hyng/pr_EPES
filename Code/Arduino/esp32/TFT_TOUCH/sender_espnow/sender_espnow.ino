@@ -107,11 +107,6 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
 
   static char TContainerCap[4] = ""; // Ensure TContainerCap is properly declared
   snprintf(TContainerCap, sizeof(TContainerCap), "%d", myData.ContainerCap);
-  if(myData.isStablized) {
-    gslc_ElemXRingGaugeSetColorActiveFlat(&m_gui, m_pElemXRingGauge1, gslc_tsColor(0, 255, 0));
-  } else {
-    gslc_ElemXRingGaugeSetColorActiveFlat(&m_gui, m_pElemXRingGauge1, gslc_tsColor(255, 255, 255));
-  }
   // Update the GUI element
   gslc_ElemSetTxtStr(&m_gui, m_pElemOutTxt3, TContainerCap);
   gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);

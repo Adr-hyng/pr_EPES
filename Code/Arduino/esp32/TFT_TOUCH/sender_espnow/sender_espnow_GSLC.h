@@ -113,7 +113,6 @@ typedef struct struct_message {
   bool isPushed; // Send to Raspberry Pi
   short SelTemp_MRange;
   bool heaterActivated;
-  bool isStablized;
   bool childLockActivated;
   bool resetMode;
 } struct_message;

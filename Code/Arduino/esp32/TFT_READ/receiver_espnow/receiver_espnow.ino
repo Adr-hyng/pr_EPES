@@ -20,14 +20,11 @@
 #include <DallasTemperature.h>
 
 #include "HX711.h"
-#include <vector>
 #include <math.h>
 #include <functional>
 
 // ------------------------------------------------
 // Program Globals
-#include <functional>
-
 class Timer {
 public:
   Timer(unsigned long interval, std::function<void()> callback)
@@ -47,34 +44,6 @@ private:
   unsigned long lastExecutionTime;
 };
 
-class RunTimeout {
-public:
-  RunTimeout(unsigned long timeout, std::function<void()> callback)
-    : timeout(timeout), callback(callback), startTime(millis()), executed(false) {}
-
-  void check() {
-    if (!executed && millis() - startTime >= timeout) {
-      executed = true;
-      callback();
-    }
-  }
-
-  void reset(unsigned long newTimeout = 0) {
-    startTime = millis();
-    executed = false;
-    if (newTimeout > 0) {
-      timeout = newTimeout;
-    }
-  }
-
-private:
-  unsigned long timeout;
-  std::function<void()> callback;
-  unsigned long startTime;
-  bool executed;
-};
-
-
 
 // Must match the sender structure
 uint8_t broadcastAddress[] = {0x34, 0x5f, 0x45, 0xa9, 0xc1, 0x08}; // New ESP
@@ -86,7 +55,6 @@ typedef struct struct_message {
   bool isPushed; // Send to Raspberry Pi
   short SelTemp_MRange;
   bool heaterActivated;
-  bool isStablized;
   bool childLockActivated;
   bool resetMode;
 } struct_message;
@@ -105,7 +73,7 @@ const int joystick_y_pin = 34;
 // HX711 circuit wiring
 const int LOADCELL_DOUT_PIN = 16;
 const int LOADCELL_SCK_PIN = 33;
-HX711 scale;
+HX711 scale(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
 float calibrationFactor = -3084.7;
 // ------------------------------------------------
 
@@ -125,9 +93,18 @@ static int16_t DebugOut(char ch) { if (ch == (char)'\n') Serial.println(""); els
 // Callback Methods
 // ------------------------------------------------
 void initializeScale() {
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  scale.set_scale(calibrationFactor);
-  scale.tare();
+  // Don't put the gallon yet.
+  scale.set_scale();
+  scale.tare(); //Reset the scale to 0
+  long zero_factor = scale.read_average(); //Get a baseline reading
+  // Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
+  // Serial.println(zero_factor);
+  delay(2000);
+  // Place the Gallon now.
+}
+float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
+  // Tutorial: https://www.electroniclinic.com/hx711-load-cell-arduino-hx711-calibration-weighing-scale-strain-gauge/
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 void execEveryMillis(unsigned long interval, std::function<void()> callback) {
   static unsigned long lastExecutionTime = 0;
@@ -138,82 +115,13 @@ void execEveryMillis(unsigned long interval, std::function<void()> callback) {
     callback();
   }
 }
-RunTimeout goBackToDefault(2000, []() {
-  gslc_ElemXRingGaugeSetColorActiveFlat(&m_gui, m_pElemXRingGauge1, gslc_tsColor(255, 255, 255));
-  myData.isStablized = false;
-});
 // Function to handle weight reading, stabilization, and lifting
-void handleWeightMeasurement(float& targetWeight, bool& isStabilized, float weightReduction = 0.05, float stabilizationThreshold = 0.3, int maxReadings = 20) {
-  static std::vector<float> weightReadings;
-  float initialVal = -1;
-  
-  if (scale.is_ready()) {
-    float weight = scale.get_units(10); // Average of 10 readings
-    weightReadings.push_back(weight);
-
-    // Maintain the maximum number of readings
-    if (weightReadings.size() > maxReadings) {
-      weightReadings.erase(weightReadings.begin());
-    }
-
-    if (weightReadings.size() == maxReadings) {
-      // Calculate mean and standard deviation
-      float mean = calculateMean(weightReadings);
-      float stddev = calculateStdDev(weightReadings, mean);
-
-      if (!isStabilized && stddev < stabilizationThreshold) {
-        // Turn green the gauge
-        isStabilized = true;
-        // Serial.println("Stabilization complete.");
-        gslc_ElemXRingGaugeSetColorActiveFlat(&m_gui, m_pElemXRingGauge1, gslc_tsColor(0, 255, 0));
-        myData.isStablized = true;
-        
-      } else if (isStabilized && stddev >= stabilizationThreshold) {
-        goBackToDefault.check();
-        targetWeight -= weightReduction; // Adjust target weight
-        // Serial.print("Lifting... Target Weight: ");
-        // Serial.print(targetWeight, 2);
-        // Serial.println(" g");
-        myData.isStablized = false;
-        myData.ContainerCap = targetWeight;
-      }
-
-      if(!(initialVal >= mean - 50) && isStabilized) { // is Empty and stablized 
-      // Not working
-        targetWeight = 0;
-      }
-
-      // // Display results
-      // Serial.print("Initial Weight: ");
-      // Serial.print(initialVal, 2);
-      // Serial.println(" g");
-      // Serial.print("Mean: ");
-      // Serial.print(mean, 2);
-      // Serial.println(" g");
-      // Serial.print("Standard Deviation: ");
-      // Serial.print(stddev, 2);
-      // Serial.println(" g");
-    }
-  } else {
-    Serial.println("HX711 not found. Check connections.");
-  }
-}
-
-// Helper functions
-float calculateMean(const std::vector<float>& readings) {
-  float sum = 0.0;
-  for (float value : readings) {
-    sum += value;
-  }
-  return sum / readings.size();
-}
-
-float calculateStdDev(const std::vector<float>& readings, float mean) {
-  float sumSqDiff = 0.0;
-  for (float value : readings) {
-    sumSqDiff += pow(value - mean, 2);
-  }
-  return sqrt(sumSqDiff / readings.size());
+void handleWeightMeasurement() {
+  scale.set_scale(calibrationFactor); //Adjust to this calibration factor
+  float weight = scale.get_units(45); 
+  if(weight<0) { weight=0.00;}
+  myData.ContainerCap = ((short)mapFloat(weight, 0.00, 101.00, 0.00, 100.00)) - 20; // x, min_x, max_x, perc_min, perc_max
+  if(myData.ContainerCap<0) { myData.ContainerCap=0;}
 }
 void sendData()
 {
@@ -283,25 +191,23 @@ void UpdateThermometerImage() {
         // gslc_ElemSetRedraw(&m_gui, m_pElemOutSelTemp, GSLC_REDRAW_FOCUS);
     }
 }
-void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigned short* newBitmap) 
-{
+void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigned short* newBitmap) {
     if (pElemRef == nullptr) {
         return; // Element reference is invalid
     }
 
     // Clear the element's background
-    // gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FOCUS);
+    gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FULL);
 
     // Update the image reference
     gslc_tsImgRef updImgRef = gslc_GetImageFromProg((const unsigned char*)newBitmap, GSLC_IMGREF_FMT_BMP24);
     gslc_ElemSetImage(pGui, pElemRef, updImgRef, updImgRef);
 
     // Trigger a redraw of the element to display the new image
-    gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FOCUS);
+    gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FULL);
 }
 // Common Button callback
-bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY)
-{
+bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY) {
   // Typecast the parameters to match the GUI and element types
   gslc_tsGui*     pGui     = (gslc_tsGui*)(pvGui);
   gslc_tsElemRef* pElemRef = (gslc_tsElemRef*)(pvElemRef);
@@ -340,7 +246,7 @@ void setup()
   // ----------------------4--------------------------
   // Initialize
   // ------------------------------------------------
-  myData.ContainerCap = 0;
+  myData.ContainerCap = -1;
   Serial.begin(115200);
   sensors.begin();
   initializeScale();
@@ -387,9 +293,7 @@ void setup()
 }
 
 Timer timer1(500, []() {
-  static float currentWaterCapacity = 50.0;
-  static bool isStabilized = false;
-  handleWeightMeasurement(currentWaterCapacity, isStabilized, 0.2);
+  handleWeightMeasurement();
   Serial.print(1);
   Serial.print(",");
   Serial.print(myData.ContainerCap);
@@ -409,7 +313,7 @@ Timer timer2(100, []() {
   y_volt = ( (y_adc_val * 3.3 ) / 4095 );  /*Convert digital value to voltage */
   myData.isPushed = (y_volt <= 1.3 && y_volt >= 0.6) || y_volt <= 0.4;
 });
-Timer timer3(10000, []() {
+Timer timer3(5000, []() {
   sensors.requestTemperatures(); 
   myData.CurTemperature = sensors.getTempCByIndex(0);
   static char TCurTemp[4] = ""; // Ensure TCurTemp is properly declared
@@ -449,13 +353,13 @@ void loop()
           ESP.restart();
         }
 
-        UpdateThermometerImage();
-
         if(onStateChange(myData.heaterActivated, tempHeaterActivated)) {
           m_pElemHeaterState = gslc_PageFindElemById(&m_gui, gslc_GetPageCur(&m_gui), HeaterIndicator);
           gslc_ElemSetGlowEn(&m_gui, m_pElemHeaterState, myData.heaterActivated);
           gslc_ElemSetGlow(&m_gui, m_pElemHeaterState, myData.heaterActivated);
         }
+
+        UpdateThermometerImage();
 
         if (onStateChange(myData.childLockActivated, tempChildLockActivated)) {
           sendData();

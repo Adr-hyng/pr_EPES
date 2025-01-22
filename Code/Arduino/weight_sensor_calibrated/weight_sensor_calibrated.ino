@@ -1,76 +1,49 @@
-/**
- * Complete project details at https://RandomNerdTutorials.com/arduino-load-cell-hx711/
- *
- * HX711 library for Arduino - example file
- * https://github.com/bogde/HX711
- *
- * MIT License
- * (c) 2018 Bogdan Necula
- *
-**/
-
 #include "HX711.h"
-
-// HX711 circuit wiring
-const int LOADCELL_DOUT_PIN = 16;
-const int LOADCELL_SCK_PIN = 33;
-HX711 scale;
-
-
-// Current Read (Negative) -> Next (Positive) -> ...
-// Remove negative readings, the least is 0.
-
-void setup() {
-  Serial.begin(57600);
-
-  Serial.println("HX711 Demo");
-  Serial.println("Initializing the scale");
-
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-
-  Serial.println("Before setting up the scale:");
-  Serial.print("read: \t\t");
-  Serial.println(scale.read());      // print a raw reading from the ADC
-
-  Serial.print("read average: \t\t");
-  Serial.println(scale.read_average(20));   // print the average of 20 readings from the ADC
-
-  Serial.print("get value: \t\t");
-  Serial.println(scale.get_value(5));   // print the average of 5 readings from the ADC minus the tare weight (not set yet)
-
-  Serial.print("get units: \t\t");
-  Serial.println(scale.get_units(10), 1);  // print the average of 5 readings from the ADC minus tare weight (not set) divided
-            // by the SCALE parameter (not set yet)
-            
-  scale.set_scale(-3084.7/100);
-  //scale.set_scale(-471.497);                      // this value is obtained by calibrating the scale with known weights; see the README for details
-  scale.tare();               // reset the scale to 0
-
-  Serial.println("After setting up the scale:");
-
-  Serial.print("read: \t\t");
-  Serial.println(scale.read());                 // print a raw reading from the ADC
-
-  Serial.print("read average: \t\t");
-  Serial.println(scale.read_average(20));       // print the average of 20 readings from the ADC
-
-  Serial.print("get value: \t\t");
-  Serial.println(scale.get_value(5));   // print the average of 5 readings from the ADC minus the tare weight, set with tare()
-
-  Serial.print("get units: \t\t");
-  Serial.println(scale.get_units(5), 1);        // print the average of 5 readings from the ADC minus tare weight, divided
-            // by the SCALE parameter set with set_scale
-
-  Serial.println("Readings:");
+#define DOUT  16
+#define CLK  33
+HX711 scale(DOUT, CLK);
+ 
+float weight; 
+float calibration_factor = -3084.7; // for me this value works just perfect 419640 
+ 
+float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
+  // Tutorial: https://www.electroniclinic.com/hx711-load-cell-arduino-hx711-calibration-weighing-scale-strain-gauge/
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
+void setup() {
+  Serial.begin(9600);
+  Serial.println("HX711 calibration sketch");
+  Serial.println("Remove all weight from scale");
+  Serial.println("After readings begin, place known weight on scale");
+  Serial.println("Press + or a to increase calibration factor");
+  Serial.println("Press - or z to decrease calibration factor");
+  scale.set_scale();
+  scale.tare(); //Reset the scale to 0
+  long zero_factor = scale.read_average(); //Get a baseline reading
+  Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
+  Serial.println(zero_factor);
+  delay(2000);
+}
 void loop() {
-  Serial.print("one reading:\t");
-  Serial.print(scale.get_units(), 1);
-  Serial.print("\t| average:\t");
-  Serial.println(scale.get_units(10), 5);
+  scale.set_scale(calibration_factor); //Adjust to this calibration factor
+  Serial.print("Reading: ");
+  weight = scale.get_units(5); 
+  if(weight<0) { weight=0.00;}
+  //Serial.print(scale.get_units(), 2);
+  // Serial.print(" lbs"); //Change this to kg and re-adjust the calibration factor if you follow SI units like a sane person
 
-  delay(5000);
+  // 57.5 = 50%
+  Serial.print("Kilogram:");
+  Serial.print( weight); 
+  Serial.print(" Kg");
+  Serial.print("Volume: ");
+  Serial.print(((short) mapFloat(weight, 0.00, 101.00, 0.00, 100.00)) - 17); // -17 because load cell is affected by grounded power supply
+  Serial.print(" - ");
+  Serial.print(mapFloat(weight, 0.00, 109.00, 0.00, 100.00));
+  Serial.print("% ");
+  Serial.println();
+  delay(500);
 }
 
 /*

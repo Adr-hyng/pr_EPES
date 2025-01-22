@@ -19,7 +19,7 @@ def serial_reader_thread():
                     try:
                         # Parse the CSV format
                         parts = line.split(',')
-                        ser.write(f"0,{random.choice([65, 75, 85])},{random.randint(0, 1)},{random.randint(0, 1)},1\n".encode('utf-8'))
+                        ser.write(f"0,{random.choice([65, 75, 85])},{random.randint(0, 1)},{random.randint(0, 1)},0\n".encode('utf-8'))
                         print(line)
                         if len(parts) == 5:
                             Receivable = int(parts[0])
