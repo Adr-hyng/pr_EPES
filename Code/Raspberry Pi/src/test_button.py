@@ -79,12 +79,11 @@ GPIO.output(LED1, GPIO.HIGH) # LOCK
 GPIO.output(LED2, GPIO.HIGH)
 GPIO.output(LED3, GPIO.HIGH) # HOT
 
+selected = WarmWater
+
 try:
     while True:
-        GPIO.output(HotWater, GPIO.HIGH)
-        sleep(2)
-        GPIO.output(HotWater, GPIO.LOW)
-        sleep(4)
+        GPIO.output(selected, GPIO.HIGH)
 #        if(GPIO.input(Button4)) == GPIO.HIGH:
 #            GPIO.output(idk2, GPIO.HIGH)
 #        else:
@@ -98,6 +97,7 @@ try:
         sleep(0.2)
         os.system('clear')
 except KeyboardInterrupt:
-    print("exiting")
+        GPIO.output(selected, GPIO.LOW)
+        print("exiting")
 finally:
-    GPIO.cleanup();
+        GPIO.cleanup();

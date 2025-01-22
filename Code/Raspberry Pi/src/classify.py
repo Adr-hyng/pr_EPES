@@ -63,8 +63,8 @@ GPIO.output(LED3, GPIO.LOW)
 
 
 detection_timestamps = []  # List to store timestamaps of detections
-min_detections = 3  # 20 = 500
-frequency_millis = 300 # Number of milliseconds to detect it is consistent container.
+min_detections = 10  # 20 = 500
+frequency_millis = 500 # Number of milliseconds to detect it is consistent container.
 box_rect_size = 20
 
 # Shared flag for joystick status
