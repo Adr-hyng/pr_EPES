@@ -17,7 +17,6 @@ import concurrent.futures
 from edge_impulse_linux.image import ImageImpulseRunner
 
 from button_handler import ButtonHandler
-from piper.TTS import generate_and_play_audio
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
@@ -64,12 +63,12 @@ GPIO.output(LED3, GPIO.LOW)
 
 
 detection_timestamps = []  # List to store timestamps of detections
-min_detections = 10  # 20 = 500
-frequency_millis = 1000 # Number of milliseconds to detect it is consistent container.
+min_detections = 3  # 20 = 500
+frequency_millis = 300 # Number of milliseconds to detect it is consistent container.
 box_rect_size = 20
 
 # Shared flag for joystick status
-# Global variables for parsed data
+# Global variables for parsed data 
 ContainerCap = 0
 Mode = 2
 CurTemperature = 0
