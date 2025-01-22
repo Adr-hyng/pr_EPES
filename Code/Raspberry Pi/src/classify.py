@@ -31,28 +31,47 @@ BAUD_RATE = 115200
 #Button Pins
 Button1 = 14 # Get Water Jug Capacity
 Button2 = 4 # Get Temperature
-Button3 = 2 # Decrease
-Button4 = 3 # Increase
-Button5 = 25 # hot
-Button6 = 22 # warm
-Button7 = 9 # temp Lock
+Button3 = 2 # Decrease Temperature
+Button4 = 3 # Increase Temperature
+Button5 = 25 # Hot Dispense
+Button6 = 22 # Warm Dispense
+Button7 = 9 # Temperature Lock
+
+# LED Pins
 LED1 = 20
 LED2 = 21
 LED3 = 27
-Buzzer1 = 6
-Buzzer2 = 13
-HotWater = 26
-WarmWater = 19
-Heater = 16
 
+# Buzzer Pins
+Buzzer1 = 5
+Buzzer2 = 6
+
+# Relay Pins
+HotWater = 19
+WarmWater = 13
+Heater = 16
+Solenoid1 = 26 # Child
+Solenoid2 = 15 # Auto
+Solenoid3 = 18 # Safe
+Solenoid4 = 17 # Trad
+Solenoid5 = 23 # Lock
+Solenoid6 = None # Empty
+
+# Relays Setup
 GPIO.setup(HotWater,GPIO.OUT)
 GPIO.setup(WarmWater,GPIO.OUT)
 GPIO.setup(Heater,GPIO.OUT)
-#LED
+GPIO.setup(Solenoid1,GPIO.OUT)
+GPIO.setup(Solenoid2,GPIO.OUT)
+GPIO.setup(Solenoid3,GPIO.OUT)
+GPIO.setup(Solenoid4,GPIO.OUT)
+GPIO.setup(Solenoid5,GPIO.OUT)
+if Solenoid6 is not None: GPIO.setup(Solenoid6,GPIO.OUT)
+
+# LEDs setup
 GPIO.setup(LED1,GPIO.OUT)
 GPIO.setup(LED2,GPIO.OUT)
 GPIO.setup(LED3,GPIO.OUT)
-
 
 GPIO.output(WarmWater, GPIO.LOW);
 GPIO.output(HotWater, GPIO.LOW);
@@ -61,14 +80,16 @@ GPIO.output(LED1, GPIO.LOW)
 GPIO.output(LED2, GPIO.LOW)
 GPIO.output(LED3, GPIO.LOW)
 
-
+# Program Globals
 detection_timestamps = []  # List to store timestamaps of detections
-min_detections = 10  # 20 = 500
-frequency_millis = 500 # Number of milliseconds to detect it is consistent container.
-box_rect_size = 20
+min_detections = 10  # Number of detection in order to consider it as consistent
+# Maximum number of milliseconds to consider it is consistent
+# If a minimum of 10 was detected within 500 ms, then it is a valid container
+frequency_millis = 500 
 
-# Shared flag for joystick status
-# Global variables for parsed data 
+box_rect_size = 20 # Constant Box collider within the faucet, and outlet.
+
+# Global variables from ESP32s
 ContainerCap = 0
 Mode = 2
 CurTemperature = 0
@@ -76,17 +97,18 @@ IsPushed = False
 WarmSelected = True
 ChildLockActivated = False
 TempSelectedIndex = 0
-TempSelectedOptions = [65, 75, 85]  # Send the selected Temperaturet to ESP32 - TODO
-HeaterActivated = False # Send to ESP32
+TempSelectedOptions = [65, 75, 85]
+HeaterActivated = False
 ResetMode = 0
 
-IsSpeakerActive = True
-
+IsSpeakerActive = True # Wait flag before TTS tries to execute again.
 STATE_FILE = "state.json"
-
 show_camera = True
 
 def generate_and_play_audio(text):
+    # Please download the binary for Raspberry 4 within Piper's repository.
+    # In this case it was already downloaded.
+    # It consumes about 40-50% of CPU spike of 500-1000 ms.
     try:
         IsSpeakerActive = True
         # Run Piper to generate audio from the input text and pipe the output directly to aplay
@@ -103,16 +125,15 @@ def generate_and_play_audio(text):
 
         # Check if both processes completed successfully
         print("DONE")
-        IsSpeakerActive = False
-        return True  # Indicate success
+        return IsSpeakerActive  # Indicate success
 
     except Exception as e:
         print(f"Error occurred: {e}")
         IsSpeakerActive = False
-        return False  # Return False if an exception occurs
-
+        return IsSpeakerActive  # Return False if an exception occurs
 
 def selected_dispenser():
+    # Pin selection based on boolean flag.
     return HotWater if not WarmSelected else WarmWater
 
 def now():
@@ -166,10 +187,11 @@ def load_state():
         print("State file not found. Using default values.")
 
 def buttons_thread():
+    # Handles the button mechanism as well as the automatic heating 
+    # system within a separate thread.
     global WarmSelected, TempSelectedIndex, HeaterActivated, ChildLockActivated, ResetMode
-    # Track the previous state of WarmSelected
+    
     previous_warm_selected = None
-
     def dispense_toggling_mechanism():
         nonlocal previous_warm_selected
         global WarmSelected
@@ -230,6 +252,14 @@ def buttons_thread():
         global ResetMode
         ResetMode = 1;
         print("RESET MODE = ", ResetMode)
+        
+    def solenoid_logic():
+        GPIO.output(Solenoid1, ChildLockActivated)
+        GPIO.output(Solenoid2, Mode == 2)
+        GPIO.output(Solenoid3, Mode == 1)
+        GPIO.output(Solenoid4, Mode == 0)
+        GPIO.output(Solenoid5, not GPIO.input(LED3))
+        if Solenoid6 is not None: GPIO.output(Solenoid6, ContainerCap <= 0)
     
     warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_warm_water)
     hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot_water, long_press_callback=toggle_childlock)
@@ -242,6 +272,7 @@ def buttons_thread():
     
     try:
         while True:
+            solenoid_logic()
             dispense_toggling_mechanism()
             electric_heater_system()
             current_time = time.time()
@@ -259,12 +290,12 @@ def buttons_thread():
         GPIO.cleanup();
 
 def serial_reader_thread():
+    # Thread managing the serial communication data from ESP32 through two-way communication
+    # Raspberry Pi 4 <-USB-> ESP32-READ <-ESP_NOW-> ESP32-Touch
     global ContainerCap, Mode, CurTemperature, IsPushed, ChildLockActivated, HeaterActivated, ResetMode
     try:
         with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1) as ser:
             print(f"Listening on {SERIAL_PORT} at {BAUD_RATE} baud...")
-            
-            #ResetMode = 1
             while True:
                 line = ser.readline().decode('utf-8').strip()
                 if line:
@@ -280,7 +311,7 @@ def serial_reader_thread():
                             CurTemperature = int(parts[3])
                             IsPushed = int(parts[4])
                             print(f"Parsed data: ContainerCap={ContainerCap}, Mode={Mode}, "
-                                  f"CurTemperature={CurTemperature}, IsPushed={IsPushed}, Reset={ResetMode}")
+                                  f"CurTemperature={CurTemperature}, IsPushed={IsPushed}, Reset={ResetMode}, Child={ChildLockActivated}")
                         else:
                             print(f"Unexpected data format: {line}")
                         if ResetMode: 
@@ -291,7 +322,7 @@ def serial_reader_thread():
         print(f"Serial error: {e}")
 
 def remove_old_detections(current_time):
-    """Remove detections older than 2 seconds."""
+    """Remove detections older than x amount of seconds."""
     global detection_timestamps
     two_seconds_ago = current_time - frequency_millis  # Convert 2 seconds to milliseconds
     detection_timestamps = [timestamp for timestamp in detection_timestamps if timestamp >= two_seconds_ago]
@@ -300,6 +331,7 @@ is_pouring = False
 def run_pump_thread(state):
     """
     Directly control the pump state with safe GPIO handling.
+    This doesnt use a thread, it just safe GPIO handling.
     """
     global is_pouring
     sel_disp_pin = selected_dispenser()
@@ -337,6 +369,7 @@ def check_for_consistent_detections():
     else: turn_pump(False)
 
 def main():
+    # Handles the object detection and dispensing mechanism
     model = "modelfile.eim"
     load_state()
 
@@ -413,12 +446,10 @@ def main():
                     next_frame = now() + 5
                     cv2.rectangle(img, (target[0] - box_rect_size // 2, target[1] - box_rect_size // 2), (target[0] + box_rect_size, target[1] + box_rect_size), (0, 255, 0), 2)
                     
-                    # Check if 2 seconds have passed since the last evaluation
+                    # Check if x amount of seconds have passed since the last evaluation
                     if current_time - last_evaluation_time >= frequency_millis:
                         if not IsPushed: turn_pump(False)
                         check_for_consistent_detections()  # Check for consistent detections    
-                        # print(RelayState)
-                        # GPIO.output(RelayPump, RelayState)    
                         last_evaluation_time = current_time  # Update the last evaluation time
                         
                 elif Mode == 2: # automatic
@@ -452,11 +483,11 @@ def main():
                     next_frame = now() + 5
                     cv2.rectangle(img, (target[0] - box_rect_size // 2, target[1] - box_rect_size // 2), (target[0] + box_rect_size, target[1] + box_rect_size), (0, 255, 0), 2)
                     
-                    # Check if 2 seconds have passed since the last evaluation
+                    # Check if x amount of seconds have passed since the last evaluation
                     if current_time - last_evaluation_time >= frequency_millis:
                         check_for_consistent_detections()  # Check for consistent detections    
-                        # GPIO.output(RelayPump, RelayState)    
                         last_evaluation_time = current_time  # Update the last evaluation time
+                
                 if show_camera:
                     cv2.imshow('edgeimpulse', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
                     if cv2.waitKey(1) == ord('q'):
@@ -465,13 +496,43 @@ def main():
             GPIO.output(WarmWater, GPIO.LOW);
             GPIO.output(HotWater, GPIO.LOW);
             GPIO.output(Heater, GPIO.LOW);
+            GPIO.output(Solenoid1, GPIO.LOW);
+            GPIO.output(Solenoid2, GPIO.LOW);
+            GPIO.output(Solenoid3, GPIO.LOW);
+            GPIO.output(Solenoid4, GPIO.LOW);
+            GPIO.output(Solenoid5, GPIO.LOW);
+            if Solenoid6 is not None: GPIO.output(Solenoid6, GPIO.LOW);
             GPIO.cleanup();
             if runner:
                 runner.stop()
 
 if __name__ == "__main__":
+    # In total it consumes 3-threads with remaining of 1-thread for 
+    # future use cases.
     serial_thread = threading.Thread(target=serial_reader_thread, daemon=True)
     serial_thread.start()
     button_thread = threading.Thread(target=buttons_thread, daemon=True)
     button_thread.start()
     main()
+    # In future please improve dataset to dont detect hands and also detect overflow
+    # separate the dataset with not_full, and full with unique and high quality data as possible
+    # especially drinking container that has sparkles and bubbles after being dispensed.
+    # Use ToF for distance, interface to ESP32
+    # Use Raspberry Pi Screen instead, so you can just use the other ESP32s for improvement.
+    # Cause currently ESP32s are used for TFT display, which are cheap.
+    # Raspberry Pi Display is should be worth it.
+    
+    # The only thing that needs to be improved are:
+    """
+    - ToF for distance, just detect within the range of dispenser
+    - Improved Model to classify between two variables: not_full, and full (Use classification instead of object detection)
+    - Use Raspberry Pi Display 7 inches.
+    - Dont buy a grounded power supply
+    - Make Fabrication of Housing non-conductive as possible.
+    - Space for components
+    - Use Mechanical Advantage for Faucet Joystick (Push n Pull) that converts analog to digital
+    - Use Raspberry Pi Camera, instead of web-cam
+    - Use Lens or glass that does not get fog or to avoid fog from the camera.
+    - Use Water Pump, as well as solenoid to avoid leaking
+    - Be Precise with your fabrication such as 3d modeling as it could save time. 
+    """

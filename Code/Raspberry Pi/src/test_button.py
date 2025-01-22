@@ -25,10 +25,10 @@ LED2 = 21
 LED3 = 27
 
 Solenoid1 = 26
-Solenoid2 = 2
-Solenoid3 = 3
-Solenoid4 = 4
-Solenoid5 = 10
+Solenoid2 = 15
+Solenoid3 = 18
+Solenoid4 = 17
+Solenoid5 = 23
 
 idk1 = 6
 
@@ -36,8 +36,8 @@ Buzzer1 = 5
 Buzzer2 = 6
 
 Heater = 16
-HotWater = 26
-WarmWater = 19
+HotWater = 19
+WarmWater = 13
 
 
 #Setup Button and LED
@@ -54,22 +54,22 @@ GPIO.setup(LED1,GPIO.OUT)
 GPIO.setup(LED2,GPIO.OUT)
 GPIO.setup(LED3,GPIO.OUT)
 
-#GPIO.setup(Solenoid1,GPIO.OUT)
-#GPIO.setup(Solenoid2,GPIO.OUT)
-#GPIO.setup(Solenoid3,GPIO.OUT)
-#GPIO.setup(Solenoid4,GPIO.OUT)
-#GPIO.setup(Solenoid5,GPIO.OUT)
+GPIO.setup(Solenoid1,GPIO.OUT)
+GPIO.setup(Solenoid2,GPIO.OUT)
+GPIO.setup(Solenoid3,GPIO.OUT)
+GPIO.setup(Solenoid4,GPIO.OUT)
+GPIO.setup(Solenoid5,GPIO.OUT)
 
 GPIO.setup(HotWater,GPIO.OUT)
 GPIO.setup(WarmWater,GPIO.OUT)
 GPIO.setup(Heater,GPIO.OUT)
 
 #flag = 0
-#GPIO.output(Solenoid1, GPIO.LOW)
-#GPIO.output(Solenoid2, GPIO.LOW)
-#GPIO.output(Solenoid3, GPIO.LOW)
-#GPIO.output(Solenoid4, GPIO.LOW)
-#GPIO.output(Solenoid5, GPIO.LOW)
+GPIO.output(Solenoid1, GPIO.LOW)
+GPIO.output(Solenoid2, GPIO.LOW)
+GPIO.output(Solenoid3, GPIO.LOW)
+GPIO.output(Solenoid4, GPIO.LOW)
+GPIO.output(Solenoid5, GPIO.LOW)
 
 GPIO.output(WarmWater, GPIO.LOW)
 GPIO.output(HotWater, GPIO.LOW)
@@ -89,6 +89,11 @@ try:
 #        else:
 #            GPIO.output(idk2, GPIO.LOW)
         print(str(GPIO.input(Button1)) + " - "+str(GPIO.input(Button2)) + " - "+str(GPIO.input(Button3)) + " - "+str(GPIO.input(Button4)) + " - " + str(int(not GPIO.input(Button5))) + " - " + str(int(not GPIO.input(Button6))) + " - " + str(int(not GPIO.input(Button7))))
+        GPIO.output(Solenoid1, not GPIO.input(Button1))
+        GPIO.output(Solenoid2, not GPIO.input(Button2))
+        GPIO.output(Solenoid5, not GPIO.input(Button3))
+        GPIO.output(Solenoid3, not GPIO.input(Button4))
+        GPIO.output(Solenoid4, GPIO.input(Button5))
 #        print(str(GPIO.input(Button5)) + " - " + str(GPIO.input(Button6)) + " - " + str(GPIO.input(Button7)))
 
         #print("Button 5 = " + str(GPIO.input(Button5)))
