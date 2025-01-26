@@ -112,7 +112,7 @@ ResetMode = 0
 IsSpeakerActive = False # Wait flag before TTS tries to execute again.
 error_flag = False
 STATE_FILE = "/home/adrian/Documents/pr_EPES/Code/Raspberry_Pi/src/state.json"
-show_camera = True
+show_camera = False
 
 def generate_and_play_audio(text):
     global IsSpeakerActive
@@ -401,6 +401,7 @@ def check_for_consistent_detections():
     else: turn_pump(False)
 
 def main():
+    global error_flag
     # Handles the object detection and dispensing mechanism
     model = "modelfile.eim"
     load_state()
@@ -530,19 +531,6 @@ def main():
         except KeyboardInterrupt:
             error_flag = True
             print("exiting")
-        except Exception:
-            GPIO.output(WarmWater, GPIO.LOW);
-            GPIO.output(HotWater, GPIO.LOW);
-            GPIO.output(Heater, GPIO.LOW);
-            GPIO.output(Solenoid1, GPIO.LOW);
-            GPIO.output(Solenoid2, GPIO.LOW);
-            GPIO.output(Solenoid3, GPIO.LOW);
-            GPIO.output(Solenoid4, GPIO.LOW);
-            GPIO.output(Solenoid5, GPIO.LOW);
-            if Solenoid6 is not None: GPIO.output(Solenoid6, GPIO.LOW);
-            GPIO.cleanup()
-            if runner:
-                runner.stop()
         finally:
             GPIO.output(WarmWater, GPIO.LOW);
             GPIO.output(HotWater, GPIO.LOW);
