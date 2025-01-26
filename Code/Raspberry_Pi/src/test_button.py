@@ -84,7 +84,7 @@ selected = WarmWater
 try:
     while True:
         #GPIO.output(selected, not GPIO.input(Button2))
-        GPIO.output(selected, GPIO.HIGH)
+        #GPIO.output(selected, GPIO.HIGH)
 #        if(GPIO.input(Button4)) == GPIO.HIGH:
 #            GPIO.output(idk2, GPIO.HIGH)
 #        else

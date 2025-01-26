@@ -18,6 +18,7 @@ from edge_impulse_linux.image import ImageImpulseRunner
 
 from button_handler import ButtonHandler
 from timed_executor import TimedExecutor
+from state_handler import StateHandler
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
@@ -110,7 +111,7 @@ ResetMode = 0
 
 IsSpeakerActive = False # Wait flag before TTS tries to execute again.
 error_flag = False
-STATE_FILE = "state.json"
+STATE_FILE = "/home/adrian/Documents/pr_EPES/Code/Raspberry_Pi/src/state.json"
 show_camera = True
 
 def generate_and_play_audio(text):
@@ -209,10 +210,10 @@ def load_state():
         print("State file not found. Using default values.")
 
 def buttons_thread():
+    alert_state = StateHandler(initial_state=ContainerCap)
     # Handles the button mechanism as well as the automatic heating 
     # system within a separate thread.
     global WarmSelected, TempSelectedIndex, HeaterActivated, ChildLockActivated, ResetMode, error_flag
-    
     previous_warm_selected = None
     def dispense_toggling_mechanism():
         nonlocal previous_warm_selected
@@ -233,7 +234,6 @@ def buttons_thread():
                 GPIO.output(LED1, GPIO.HIGH)
                 GPIO.output(WarmWater, GPIO.LOW)
                 GPIO.output(HotWater, GPIO.LOW)
-            
     def toggle_hot_water():
         global WarmSelected
         WarmSelected = False
@@ -242,7 +242,6 @@ def buttons_thread():
         global WarmSelected
         WarmSelected = True
         save_state()
-        
     def increase_temp():
         global TempSelectedIndex
         if GPIO.input(LED3) != GPIO.LOW: return;
@@ -251,7 +250,6 @@ def buttons_thread():
             return
         TempSelectedIndex += 1
         save_state()
-        
     def decrease_temp():
         global TempSelectedIndex
         if GPIO.input(LED3) != GPIO.LOW: return;
@@ -260,7 +258,6 @@ def buttons_thread():
             return
         TempSelectedIndex -= 1
         save_state()
-        
     def electric_heater_system():
         global HeaterActivated
         HeaterActivated = GPIO.input(Heater)
@@ -268,17 +265,14 @@ def buttons_thread():
             GPIO.output(Heater, GPIO.LOW)
         elif CurTemperature <= (TempSelectedOptions[TempSelectedIndex] - 5) and HeaterActivated == GPIO.LOW:
             GPIO.output(Heater, GPIO.HIGH)
-    
     def toggle_childlock():
         global ChildLockActivated
         ChildLockActivated = not ChildLockActivated
         save_state()
-        
     def pressed_reset():
         global ResetMode
         ResetMode = 1;
         print("RESET MODE = ", ResetMode)
-        
     def solenoid_logic():
         GPIO.output(Solenoid1, ChildLockActivated)
         GPIO.output(Solenoid2, Mode == 2)
@@ -286,12 +280,13 @@ def buttons_thread():
         GPIO.output(Solenoid4, Mode == 0)
         GPIO.output(Solenoid5, not GPIO.input(LED3))
         if Solenoid6 is not None: GPIO.output(Solenoid6, ContainerCap <= 0)
-        
     def alert_for_refill():
-        if ContainerCap <= 10:
-            playTTS("Jug Capacity is 10 percent below.")
-        elif ContainerCap <= 0:
-            playTTS("Jug Capacity is empty. Please refill")
+        global ContainerCap
+        if alert_state.on_state_change(ContainerCap):  # Check if state has changed
+            if ContainerCap <= 10:
+                playTTS("Jug Capacity is 10 percent below.")
+            elif ContainerCap <= 0:
+                playTTS("Jug Capacity is empty. Please refill")
     
     warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_warm_water)
     hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot_water, long_press_callback=toggle_childlock)
@@ -319,7 +314,7 @@ def buttons_thread():
             time.sleep(0.05)
     except KeyboardInterrupt:
         print("exiting")
-    except:
+    except Exception:
         error_flag = True
 
 def serial_reader_thread():
@@ -532,7 +527,10 @@ def main():
                     cv2.imshow('edgeimpulse', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
                     if cv2.waitKey(1) == ord('q'):
                         break
-        except:
+        except KeyboardInterrupt:
+            error_flag = True
+            print("exiting")
+        except Exception:
             GPIO.output(WarmWater, GPIO.LOW);
             GPIO.output(HotWater, GPIO.LOW);
             GPIO.output(Heater, GPIO.LOW);
@@ -563,10 +561,10 @@ if __name__ == "__main__":
     # In total it consumes 3-threads with remaining of 1-thread for 
     # future use cases.
     playTTS(f"Booting Completed")
-    serial_thread = threading.Thread(target=serial_reader_thread, daemon=True)
-    serial_thread.start()
     button_thread = threading.Thread(target=buttons_thread, daemon=True)
     button_thread.start()
+    serial_thread = threading.Thread(target=serial_reader_thread, daemon=True)
+    serial_thread.start()
     main()
     # In future please improve dataset to dont detect hands and also detect overflow
     # separate the dataset with not_full, and full with unique and high quality data as possible
