@@ -108,11 +108,13 @@ TempSelectedOptions = [65, 75, 85]
 HeaterActivated = False
 ResetMode = 0
 
-IsSpeakerActive = True # Wait flag before TTS tries to execute again.
+IsSpeakerActive = False # Wait flag before TTS tries to execute again.
+error_flag = False
 STATE_FILE = "state.json"
 show_camera = True
 
 def generate_and_play_audio(text):
+    global IsSpeakerActive
     # Please download the binary for Raspberry 4 within Piper's repository.
     # In this case it was already downloaded.
     # It consumes about 40-50% of CPU spike of 500-1000 ms.
@@ -138,13 +140,19 @@ def generate_and_play_audio(text):
         aplay_process.wait()  # Wait for aplay to finish
 
         # Check if both processes completed successfully
+        IsSpeakerActive = False
         print("DONE")
-        return IsSpeakerActive  # Indicate success
 
     except Exception as e:
         print(f"Error occurred: {e}")
         IsSpeakerActive = False
-        return IsSpeakerActive  # Return False if an exception occurs
+
+def playTTS(text):
+    global IsSpeakerActive
+    if IsSpeakerActive: return
+    """Plays text-to-speech (TTS) in a separate thread."""
+    tts_thread = threading.Thread(target=generate_and_play_audio, args=(text,))
+    tts_thread.start()  # Start the thread to play audio
 
 def selected_dispenser():
     # Pin selection based on boolean flag.
@@ -203,7 +211,7 @@ def load_state():
 def buttons_thread():
     # Handles the button mechanism as well as the automatic heating 
     # system within a separate thread.
-    global WarmSelected, TempSelectedIndex, HeaterActivated, ChildLockActivated, ResetMode
+    global WarmSelected, TempSelectedIndex, HeaterActivated, ChildLockActivated, ResetMode, error_flag
     
     previous_warm_selected = None
     def dispense_toggling_mechanism():
@@ -278,6 +286,12 @@ def buttons_thread():
         GPIO.output(Solenoid4, Mode == 0)
         GPIO.output(Solenoid5, not GPIO.input(LED3))
         if Solenoid6 is not None: GPIO.output(Solenoid6, ContainerCap <= 0)
+        
+    def alert_for_refill():
+        if ContainerCap <= 10:
+            playTTS("Jug Capacity is 10 percent below.")
+        elif ContainerCap <= 0:
+            playTTS("Jug Capacity is empty. Please refill")
     
     warm_button = ButtonHandler(Button6, Buzzer2, -1, 1.5, short_press_callback=toggle_warm_water)
     hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot_water, long_press_callback=toggle_childlock)
@@ -285,11 +299,12 @@ def buttons_thread():
 
     increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_press_callback=increase_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW,pull_mode="PULLUP")
     decrease_button = ButtonHandler(Button3, Buzzer1, -1, 60, short_press_callback=decrease_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW,pull_mode="PULLUP")
-    get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60,pull_mode="PULLUP", short_press_callback=lambda: generate_and_play_audio(f"Jug capacity is {ContainerCap} percent") if IsSpeakerActive else None)
-    get_temperature_button = ButtonHandler(Button2, Buzzer1, Buzzer1, 5, short_press_callback=lambda: generate_and_play_audio(f"Current temperature is {CurTemperature} degree celcius") if IsSpeakerActive else None, long_press_callback=pressed_reset,pull_mode="PULLUP")
+    get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60,pull_mode="PULLUP", short_press_callback=lambda: playTTS(f"Jug Capacity is {ContainerCap} percent"))
+    get_temperature_button = ButtonHandler(Button2, Buzzer1, Buzzer1, 5, short_press_callback=lambda: playTTS(f"Current temperature is {CurTemperature} degree celcius"), long_press_callback=pressed_reset,pull_mode="PULLUP")
     
     try:
         while True:
+            alert_for_refill()
             #solenoid_logic()
             dispense_toggling_mechanism()
             electric_heater_system()
@@ -304,13 +319,13 @@ def buttons_thread():
             time.sleep(0.05)
     except KeyboardInterrupt:
         print("exiting")
-    finally:
-        GPIO.cleanup();
+    except:
+        error_flag = True
 
 def serial_reader_thread():
     # Thread managing the serial communication data from ESP32 through two-way communication
     # Raspberry Pi 4 <-USB-> ESP32-READ <-ESP_NOW-> ESP32-Touch
-    global ContainerCap, Mode, CurTemperature, IsPushed, ChildLockActivated, HeaterActivated, ResetMode
+    global ContainerCap, Mode, CurTemperature, IsPushed, ChildLockActivated, HeaterActivated, ResetMode, error_flag
     try:
         with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1) as ser:
             send_data = TimedExecutor(500) # 100 ms
@@ -338,16 +353,10 @@ def serial_reader_thread():
                             ResetMode = 0
                     except ValueError:
                         print(f"Failed to parse: {line}")
-            print("ERROR")
     except serial.SerialException as e:
         print(f"Serial error: {e}")
-        generate_and_play_audio("Serial Error. Please unplug and plug again.")
-        GPIO.output(WarmWater, GPIO.LOW);
-        GPIO.output(HotWater, GPIO.LOW);
-        GPIO.output(Heater, GPIO.LOW);
-        GPIO.cleanup();
-        if runner:
-            runner.stop()
+        playTTS("Serial Error. Please unplug and plug again.")
+        error_flag = True
 
 def remove_old_detections(current_time):
     """Remove detections older than x amount of seconds."""
@@ -417,6 +426,7 @@ def main():
             labels = model_info['model_parameters']['labels']
             port_ids = get_webcams()
             if len(port_ids) == 0:
+                playTTS("Camera Error. Please unplug and plug again.")
                 raise Exception('Cannot find any webcams')
             videoCaptureDeviceId = int(port_ids[0])
 
@@ -434,6 +444,8 @@ def main():
             next_frame = 0  # limit to ~10 fps here
 
             for res, img in runner.classifier(videoCaptureDeviceId):
+                if error_flag:
+                    raise Exception("Something is wrong")
                 color = (255, 0, 0)
                 
                 if Mode == 0: # traditional
@@ -520,6 +532,19 @@ def main():
                     cv2.imshow('edgeimpulse', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
                     if cv2.waitKey(1) == ord('q'):
                         break
+        except:
+            GPIO.output(WarmWater, GPIO.LOW);
+            GPIO.output(HotWater, GPIO.LOW);
+            GPIO.output(Heater, GPIO.LOW);
+            GPIO.output(Solenoid1, GPIO.LOW);
+            GPIO.output(Solenoid2, GPIO.LOW);
+            GPIO.output(Solenoid3, GPIO.LOW);
+            GPIO.output(Solenoid4, GPIO.LOW);
+            GPIO.output(Solenoid5, GPIO.LOW);
+            if Solenoid6 is not None: GPIO.output(Solenoid6, GPIO.LOW);
+            GPIO.cleanup()
+            if runner:
+                runner.stop()
         finally:
             GPIO.output(WarmWater, GPIO.LOW);
             GPIO.output(HotWater, GPIO.LOW);
@@ -530,14 +555,14 @@ def main():
             GPIO.output(Solenoid4, GPIO.LOW);
             GPIO.output(Solenoid5, GPIO.LOW);
             if Solenoid6 is not None: GPIO.output(Solenoid6, GPIO.LOW);
-            GPIO.cleanup();
+            GPIO.cleanup()
             if runner:
                 runner.stop()
 
 if __name__ == "__main__":
     # In total it consumes 3-threads with remaining of 1-thread for 
     # future use cases.
-    generate_and_play_audio(f"Booting Completed")
+    playTTS(f"Booting Completed")
     serial_thread = threading.Thread(target=serial_reader_thread, daemon=True)
     serial_thread.start()
     button_thread = threading.Thread(target=buttons_thread, daemon=True)
