@@ -17,6 +17,7 @@ import concurrent.futures
 from edge_impulse_linux.image import ImageImpulseRunner
 
 from button_handler import ButtonHandler
+from timed_executor import TimedExecutor
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
@@ -48,9 +49,9 @@ Buzzer2 = 6
 
 # Relay Pins
 HotWater = 19
-WarmWater = 13
+WarmWater = 26
 Heater = 16
-Solenoid1 = 26 # Child
+Solenoid1 = 13 # Child
 Solenoid2 = 15 # Auto
 Solenoid3 = 18 # Safe
 Solenoid4 = 17 # Trad
@@ -76,6 +77,12 @@ GPIO.setup(LED3,GPIO.OUT)
 GPIO.output(WarmWater, GPIO.LOW);
 GPIO.output(HotWater, GPIO.LOW);
 GPIO.output(Heater, GPIO.LOW);
+GPIO.output(Solenoid1, GPIO.LOW);
+GPIO.output(Solenoid2, GPIO.LOW);
+GPIO.output(Solenoid3, GPIO.LOW);
+GPIO.output(Solenoid4, GPIO.LOW);
+GPIO.output(Solenoid5, GPIO.LOW);
+if Solenoid6 is not None: GPIO.output(Solenoid6, GPIO.LOW);
 GPIO.output(LED1, GPIO.LOW)
 GPIO.output(LED2, GPIO.LOW)
 GPIO.output(LED3, GPIO.LOW)
@@ -112,7 +119,14 @@ def generate_and_play_audio(text):
     try:
         IsSpeakerActive = True
         # Run Piper to generate audio from the input text and pipe the output directly to aplay
-        piper_command = ['sudo', './piper/piper', '-m', './piper/models/en_US-amy-low.onnx', '-c', './piper/models/en_US-amy-low.onnx.json', '-s', '0', '-f', '-']
+        piper_command = [
+            '/home/adrian/Documents/pr_EPES/Code/Raspberry_Pi/src/piper/piper', 
+            '-m', '/home/adrian/Documents/pr_EPES/Code/Raspberry_Pi/src/piper/models/en_US-amy-low.onnx', 
+            '-c', '/home/adrian/Documents/pr_EPES/Code/Raspberry_Pi/src/piper/models/en_US-amy-low.onnx.json', 
+            '-s', '0', 
+            '-f', '-'
+        ]
+
         
         # Use subprocess to pipe the text into Piper and then directly to aplay
         piper_process = subprocess.Popen(piper_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -224,14 +238,18 @@ def buttons_thread():
     def increase_temp():
         global TempSelectedIndex
         if GPIO.input(LED3) != GPIO.LOW: return;
-        if(TempSelectedIndex >= len(TempSelectedOptions) - 1): return;
+        if(TempSelectedIndex >= len(TempSelectedOptions) - 1):
+            TempSelectedIndex = 0
+            return
         TempSelectedIndex += 1
         save_state()
         
     def decrease_temp():
         global TempSelectedIndex
         if GPIO.input(LED3) != GPIO.LOW: return;
-        if(TempSelectedIndex == 0): return;
+        if(TempSelectedIndex == 0):
+            TempSelectedIndex = len(TempSelectedOptions) - 1
+            return
         TempSelectedIndex -= 1
         save_state()
         
@@ -272,7 +290,7 @@ def buttons_thread():
     
     try:
         while True:
-            solenoid_logic()
+            #solenoid_logic()
             dispense_toggling_mechanism()
             electric_heater_system()
             current_time = time.time()
@@ -295,14 +313,16 @@ def serial_reader_thread():
     global ContainerCap, Mode, CurTemperature, IsPushed, ChildLockActivated, HeaterActivated, ResetMode
     try:
         with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1) as ser:
+            send_data = TimedExecutor(500) # 100 ms
             print(f"Listening on {SERIAL_PORT} at {BAUD_RATE} baud...")
             while True:
                 line = ser.readline().decode('utf-8').strip()
+                send_data.execute(ser, f"0,{TempSelectedOptions[TempSelectedIndex]},{1 if HeaterActivated else 0},{1 if ChildLockActivated else 0 },{ResetMode}\n")
+                
                 if line:
                     try:
                         # Parse the CSV format
                         parts = line.split(',')
-                        ser.write(f"0,{TempSelectedOptions[TempSelectedIndex]},{1 if HeaterActivated else 0},{1 if ChildLockActivated else 0 },{ResetMode}\n".encode('utf-8'))
                         if len(parts) == 5:
                             Receivable = int(parts[0])
                             if Receivable == 0: continue # IGNORE some data that should not be received.
@@ -318,8 +338,16 @@ def serial_reader_thread():
                             ResetMode = 0
                     except ValueError:
                         print(f"Failed to parse: {line}")
+            print("ERROR")
     except serial.SerialException as e:
         print(f"Serial error: {e}")
+        generate_and_play_audio("Serial Error. Please unplug and plug again.")
+        GPIO.output(WarmWater, GPIO.LOW);
+        GPIO.output(HotWater, GPIO.LOW);
+        GPIO.output(Heater, GPIO.LOW);
+        GPIO.cleanup();
+        if runner:
+            runner.stop()
 
 def remove_old_detections(current_time):
     """Remove detections older than x amount of seconds."""
@@ -509,6 +537,7 @@ def main():
 if __name__ == "__main__":
     # In total it consumes 3-threads with remaining of 1-thread for 
     # future use cases.
+    generate_and_play_audio(f"Booting Completed")
     serial_thread = threading.Thread(target=serial_reader_thread, daemon=True)
     serial_thread.start()
     button_thread = threading.Thread(target=buttons_thread, daemon=True)

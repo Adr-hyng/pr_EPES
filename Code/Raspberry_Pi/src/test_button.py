@@ -37,7 +37,7 @@ Buzzer2 = 6
 
 Heater = 16
 HotWater = 19
-WarmWater = 13
+WarmWater = 26
 
 
 #Setup Button and LED
@@ -83,17 +83,20 @@ selected = WarmWater
 
 try:
     while True:
+        #GPIO.output(selected, not GPIO.input(Button2))
         GPIO.output(selected, GPIO.HIGH)
 #        if(GPIO.input(Button4)) == GPIO.HIGH:
 #            GPIO.output(idk2, GPIO.HIGH)
-#        else:
+#        else
 #            GPIO.output(idk2, GPIO.LOW)
         print(str(GPIO.input(Button1)) + " - "+str(GPIO.input(Button2)) + " - "+str(GPIO.input(Button3)) + " - "+str(GPIO.input(Button4)) + " - " + str(int(not GPIO.input(Button5))) + " - " + str(int(not GPIO.input(Button6))) + " - " + str(int(not GPIO.input(Button7))))
-        GPIO.output(Solenoid1, not GPIO.input(Button1))
-        GPIO.output(Solenoid2, not GPIO.input(Button2))
-        GPIO.output(Solenoid5, not GPIO.input(Button3))
-        GPIO.output(Solenoid3, not GPIO.input(Button4))
-        GPIO.output(Solenoid4, GPIO.input(Button5))
+#        print(str(GPIO.input(LED1)) + " _ " + str(GPIO.input(LED2)) + " _ " + str(GPIO.input(LED3)))
+        print(str(GPIO.input(selected)))
+#        GPIO.output(Solenoid1, not GPIO.input(Button1))
+#        GPIO.output(Solenoid2, not GPIO.input(Button2))
+#        GPIO.output(Solenoid5, not GPIO.input(Button3))
+#        GPIO.output(Solenoid3, not GPIO.input(Button4))
+#        GPIO.output(Solenoid4, GPIO.input(Button5))
 #        print(str(GPIO.input(Button5)) + " - " + str(GPIO.input(Button6)) + " - " + str(GPIO.input(Button7)))
 
         #print("Button 5 = " + str(GPIO.input(Button5)))
