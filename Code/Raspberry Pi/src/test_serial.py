@@ -1,5 +1,6 @@
 import serial
 import random
+import time
 
 SERIAL_PORT = 'COM6'  # Adjust based on your setup
 BAUD_RATE = 115200
@@ -20,6 +21,7 @@ def serial_reader_thread():
                         # Parse the CSV format
                         parts = line.split(',')
                         ser.write(f"0,{random.choice([65, 75, 85])},{random.randint(0, 1)},{random.randint(0, 1)},0\n".encode('utf-8'))
+                        time.sleep(1)
                         print(line)
                         if len(parts) == 5:
                             Receivable = int(parts[0])
@@ -34,6 +36,7 @@ def serial_reader_thread():
                             print(f"Unexpected data format: {line}")
                     except ValueError:
                         print(f"Failed to parse: {line}")
+                time.sleep(2)
     except serial.SerialException as e:
         print(f"Serial error: {e}")
         

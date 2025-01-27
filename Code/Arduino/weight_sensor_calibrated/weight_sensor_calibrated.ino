@@ -34,11 +34,13 @@ void loop() {
   // Serial.print(" lbs"); //Change this to kg and re-adjust the calibration factor if you follow SI units like a sane person
 
   // 57.5 = 50%
-  Serial.print("Kilogram:");
+  Serial.print("Read:");
+  Serial.print(scale.read());
+  Serial.print("\tKilogram:");
   Serial.print( weight); 
   Serial.print(" Kg");
   Serial.print("Volume: ");
-  Serial.print(((short) mapFloat(weight, 0.00, 101.00, 0.00, 100.00)) - 17); // -17 because load cell is affected by grounded power supply
+  Serial.print(((short) mapFloat(weight, 0.00, 92.00, 0.00, 100.00)) - 17); // -17 because load cell is affected by grounded power supply
   Serial.print(" - ");
   Serial.print(mapFloat(weight, 0.00, 109.00, 0.00, 100.00));
   Serial.print("% ");

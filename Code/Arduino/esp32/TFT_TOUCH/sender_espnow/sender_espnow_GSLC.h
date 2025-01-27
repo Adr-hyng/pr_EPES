@@ -1,17 +1,5 @@
-//<File !Start!>
-// FILE: [sender_espnow_GSLC.h]
-// Created by GUIslice Builder version: [0.17.b34]
-//
-// GUIslice Builder Generated GUI Framework File
-//
-// For the latest guides, updates and support view:
-// https://github.com/ImpulseAdventure/GUIslice
-//
-//<File !End!>
-
 #ifndef _GUISLICE_GEN_H
 #define _GUISLICE_GEN_H
-
 // ------------------------------------------------
 // Headers to include
 // ------------------------------------------------
@@ -31,10 +19,6 @@
 #include "elem/XRingGauge.h"
 //<Includes !End!>
 
-// ------------------------------------------------
-// Headers and Defines for fonts
-// Note that font files are located within the Adafruit-GFX library folder:
-// ------------------------------------------------
 //<Fonts !Start!>
 #if !defined(DRV_DISP_TFT_ESPI)
   #error E_PROJECT_OPTIONS tab->Graphics Library should be Adafruit_GFX
@@ -44,9 +28,6 @@
 
 // ------------------------------------------------
 // Defines for resources
-// #define TFT_MIRROR_X // Comment this if enabled
-// #define TFT_MIRROR_Y // Comment this if enabled
-
 // ------------------------------------------------
 //<Resources !Start!>
 extern "C" const unsigned short AUTO_BUTTON[] PROGMEM;
@@ -65,8 +46,9 @@ extern "C" const unsigned short TRAD_BUTTON_SEL[] PROGMEM;
 // ------------------------------------------------
 //<Enum !Start!>
 enum {E_PG_MAIN};
-enum {AutoBtn,ChildLockIndicator,ContainerCap,E_DRAW_LINE1,E_DRAW_LINE2
-      ,E_ELEM_IMAGE9,E_ELEM_TEXT2,SafeBtn,TradBtn,WaterCapGauge};
+enum {AutoBtn,ChildLockIndicator,ContainerCap,
+      E_DRAW_LINE1,E_DRAW_LINE2,E_ELEM_IMAGE9,
+      E_ELEM_TEXT2,SafeBtn,TradBtn,WaterCapGauge};
 // Must use separate enum for fonts with MAX_FONT at end to use gslc_FontSet.
 enum {E_BUILTIN15X24,E_BUILTIN5X8,MAX_FONT};
 //<Enum !End!>
@@ -80,7 +62,6 @@ enum {E_BUILTIN15X24,E_BUILTIN5X8,MAX_FONT};
 // ------------------------------------------------
 //<ElementDefines !Start!>
 #define MAX_PAGE                1
-
 #define MAX_ELEM_PG_MAIN 10 // # Elems total on page
 #define MAX_ELEM_PG_MAIN_RAM MAX_ELEM_PG_MAIN // # Elems in RAM
 //<ElementDefines !End!>
@@ -104,13 +85,12 @@ gslc_tsXRingGauge               m_sXRingGauge1;
 
 // ------------------------------------------------
 // Program Globals
-bool g_ButtonFlags[3] = {false, false, true}; // Glowing buttons
-// Must match the receiver structure
+bool g_ButtonFlags[3] = {false, false, true};
 typedef struct struct_message {
-  short ContainerCap; // Send to Raspberry Pi
-  short Mode; // Send to Raspberry Pi
-  short CurTemperature; // Send to Raspberry Pi
-  bool isPushed; // Send to Raspberry Pi
+  short ContainerCap;
+  short Mode;
+  short CurTemperature;
+  bool isPushed;
   short SelTemp_MRange;
   bool heaterActivated;
   bool childLockActivated;
@@ -123,47 +103,21 @@ typedef struct struct_message {
 extern gslc_tsElemRef* m_pElemOutTxt3;
 extern gslc_tsElemRef* m_pElemXRingGauge1;
 //<Extern_References !End!>
-
-// Define debug message function
-static int16_t DebugOut(char ch);
-
-// ------------------------------------------------
-// Callback Methods
-// ------------------------------------------------
-void execEveryMillis(unsigned long interval, void (*callback)());
-void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigned short* newBitmap);
-void save_to_nvs(const char* key, int value);
-int load_from_nvs(const char* key, int default_value);
-void CbRetoggleBtn(gslc_tsGui* pGui, short selBtnElem);
-bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY);
-bool CbCheckbox(void* pvGui, void* pvElemRef, int16_t nSelId, bool bState);
-bool CbDrawScanner(void* pvGui,void* pvElemRef,gslc_teRedrawType eRedraw);
-bool CbKeypad(void* pvGui, void *pvElemRef, int16_t nState, void* pvData);
-bool CbListbox(void* pvGui, void* pvElemRef, int16_t nSelId);
-bool CbSlidePos(void* pvGui,void* pvElemRef,int16_t nPos);
-bool CbSpinner(void* pvGui, void *pvElemRef, int16_t nState, void* pvData);
-bool CbTickScanner(void* pvGui,void* pvScope);
-
 // ------------------------------------------------
 // Create page elements
 // ------------------------------------------------
 void InitGUIslice_gen()
 {
   gslc_tsElemRef* pElemRef = NULL;
-
   if (!gslc_Init(&m_gui,&m_drv,m_asPage,MAX_PAGE,m_asFont,MAX_FONT)) { return; }
-
-  // Initialize NVS
+  // Initialize Non-volatile storage for database
   esp_err_t ret = nvs_flash_init();
   if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       ESP_ERROR_CHECK(nvs_flash_erase());
       ret = nvs_flash_init();
   }
   ESP_ERROR_CHECK(ret);
-
-  // Load the last mode from NVS
   int last_mode = load_from_nvs(NVS_KEY_MODE, 1);
-
   // ------------------------------------------------
   // Load Fonts1
   // ------------------------------------------------
@@ -175,17 +129,9 @@ void InitGUIslice_gen()
 //<InitGUI !Start!>
   gslc_PageAdd(&m_gui,E_PG_MAIN,m_asPage1Elem,MAX_ELEM_PG_MAIN_RAM,m_asPage1ElemRef,MAX_ELEM_PG_MAIN);
 
-  // NOTE: The current page defaults to the first page added. Here we explicitly
-  //       ensure that the main page is the correct page no matter the add order.
   gslc_SetPageCur(&m_gui,E_PG_MAIN);
-  
-  // Set Background to a flat color
   gslc_SetBkgndColor(&m_gui,GSLC_COL_BLACK);
 
-  // -----------------------------------
-  // PAGE: E_PG_MAIN
-  
-  
   // Create AutoBtn button with image label
   pElemRef = gslc_ElemCreateBtnImg(&m_gui,AutoBtn,E_PG_MAIN,(gslc_tsRect){150,7,85,85},
           gslc_GetImageFromProg((const unsigned char*)AUTO_BUTTON,GSLC_IMGREF_FMT_BMP24),
@@ -256,7 +202,6 @@ void InitGUIslice_gen()
 //<InitGUI !End!>
 
 //<Startup !Start!>
-  // Set the default glowing button based on last_mode
   if (last_mode == 0) {
       // Set Traditional Mode as active
       gslc_tsElemRef* pElemRef2 = gslc_PageFindElemById(&m_gui, E_PG_MAIN, TradBtn);
@@ -273,11 +218,8 @@ void InitGUIslice_gen()
       gslc_ElemSetGlowEn(&m_gui, pElemRef2, true);
       gslc_ElemSetGlow(&m_gui, pElemRef2, true);
   }
-
   gslc_GuiRotate(&m_gui, 0);
-
 //<Startup !End!>
-
 }
 
 #endif // end _GUISLICE_GEN_H

@@ -1,14 +1,3 @@
-//<App !Start!>
-// FILE: [receiver_espnow.ino]
-// Created by GUIslice Builder version: [0.17.b34]
-//
-// GUIslice Builder Generated File
-//
-// For the latest guides, updates and support view:
-// https://github.com/ImpulseAdventure/GUIslice
-//
-//<App !End!>
-
 // ------------------------------------------------
 // Headers to include
 // ------------------------------------------------
@@ -27,9 +16,10 @@
 // Program Globals
 class Timer {
 public:
-  Timer(unsigned long interval, std::function<void()> callback)
-    : interval(interval), callback(callback), lastExecutionTime(0) {}
-
+  Timer(unsigned long interval, 
+  std::function<void()> callback
+  ) : interval(interval), callback(callback), 
+  lastExecutionTime(0) {}
   void check() {
     unsigned long currentMillis = millis();
     if (currentMillis - lastExecutionTime >= interval) {
@@ -37,22 +27,23 @@ public:
       callback();
     }
   }
-
 private:
   unsigned long interval;
   std::function<void()> callback;
   unsigned long lastExecutionTime;
 };
 
-
 // Must match the sender structure
-uint8_t broadcastAddress[] = {0x34, 0x5f, 0x45, 0xa9, 0xc1, 0x08}; // New ESP
+uint8_t ESPTMacAddr[] = {
+  0x34, 0x5f, 0x45, 
+  0xa9, 0xc1, 0x08
+};
 esp_now_peer_info_t peerInfo;
 typedef struct struct_message {
-  short ContainerCap; // Send to Raspberry Pi
-  short Mode; // Send to Raspberry Pi
-  short CurTemperature; // Send to Raspberry Pi
-  bool isPushed; // Send to Raspberry Pi
+  short ContainerCap;
+  short Mode;
+  short CurTemperature;
+  bool isPushed;
   short SelTemp_MRange;
   bool heaterActivated;
   bool childLockActivated;
@@ -87,23 +78,22 @@ gslc_tsElemRef* m_pElemHeaterState= NULL;
 //<Save_References !End!>
 
 // Define debug message function
-static int16_t DebugOut(char ch) { if (ch == (char)'\n') Serial.println(""); else Serial.write(ch); return 0; }
+static int16_t DebugOut(char ch) {
+  if (ch == (char)'\n') Serial.println(""); 
+  else Serial.write(ch); 
+  return 0;
+}
 
 // ------------------------------------------------
 // Callback Methods
 // ------------------------------------------------
 void initializeScale() {
-  // Don't put the gallon yet.
   scale.set_scale();
-  scale.tare(); //Reset the scale to 0
-  long zero_factor = scale.read_average(); //Get a baseline reading
-  // Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
-  // Serial.println(zero_factor);
+  scale.tare();
+  long zero_factor = scale.read_average();
   delay(2000);
-  // Place the Gallon now.
 }
 float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
-  // Tutorial: https://www.electroniclinic.com/hx711-load-cell-arduino-hx711-calibration-weighing-scale-strain-gauge/
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 void execEveryMillis(unsigned long interval, std::function<void()> callback) {
@@ -115,48 +105,26 @@ void execEveryMillis(unsigned long interval, std::function<void()> callback) {
     callback();
   }
 }
-// Function to handle weight reading, stabilization, and lifting
 void handleWeightMeasurement() {
-  scale.set_scale(calibrationFactor); //Adjust to this calibration factor
+  scale.set_scale(calibrationFactor);
   float weight = scale.get_units(45); 
   if(weight<0) { weight=0.00;}
-  myData.ContainerCap = ((short)mapFloat(weight, 0.00, 101.00, 0.00, 100.00)) - 20; // x, min_x, max_x, perc_min, perc_max
+  myData.ContainerCap = ((short)mapFloat(weight, 0.00, 91.00, 0.00, 100.00)) - 20;
   if(myData.ContainerCap<0) { myData.ContainerCap=0;}
 }
-void sendData()
-{
-  // Set values to send
+void sendData() {
   myData.Mode = myData.Mode;
   myData.childLockActivated = myData.childLockActivated;
-
-  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&myData, sizeof(myData));
+  esp_err_t result = esp_now_send(ESPTMacAddr, (uint8_t *)&myData, sizeof(myData));
   gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
-  // if (result == ESP_OK) {
-  //   Serial.println("Sent with success");
-  // } else {
-  //   Serial.println("Error sending the data");
-  // }
 }
 // callback function that will be executed when data is received
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   memcpy(&myData, incomingData, sizeof(myData));
-  // Serial.print("Bytes received: ");
-  // Serial.println(len);
-  // Serial.print("Capacity: ");
-  // Serial.println(myData.ContainerCap);
-  // Serial.print("Mode: ");
-  // Serial.println(myData.Mode);
-  // Serial.print("Current Temp.: ");
-  // Serial.println(myData.CurTemperature);
-  // Serial.println();
-  
   gslc_ElemXRingGaugeSetVal(&m_gui, m_pElemXRingGauge1, myData.ContainerCap);
   redrawRequired = true;
 }
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
-{
-  // Serial.print("\r\nLast Packet Send Status:\t");
-  // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   return;
 }
 bool onStateChange(bool& currentState, bool newValue) {
@@ -164,15 +132,15 @@ bool onStateChange(bool& currentState, bool newValue) {
   if (currentState != newValue) {
     previousState = currentState;
     currentState = newValue;
-    return true; // Change detected
+    return true;
   }
-  return false; // No change
+  return false;
 }
 void UpdateThermometerImage() {
-    static short lastSelTemp_MRange = -1; // Initialize with an invalid value
+    static short lastSelTemp_MRange = -1;
 
     if (myData.SelTemp_MRange != lastSelTemp_MRange) {
-        lastSelTemp_MRange = myData.SelTemp_MRange; // Update the last known value
+        lastSelTemp_MRange = myData.SelTemp_MRange;
 
         if (myData.SelTemp_MRange == 85) {
             UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER);
@@ -182,30 +150,22 @@ void UpdateThermometerImage() {
             UpdateBitmapImage(&m_gui, m_pElemOutThermometerIMG, THERMOMETER_2);
         }
 
-        static char TSelTemp[4] = ""; // Ensure TCurTemp is properly declared
+        static char TSelTemp[4] = "";
         snprintf(TSelTemp, sizeof(TSelTemp), "%d", myData.SelTemp_MRange);
         if (m_pElemOutSelTemp != NULL) {
           gslc_ElemSetTxtStr(&m_gui, m_pElemOutSelTemp, TSelTemp);
         } 
-
-        // gslc_ElemSetRedraw(&m_gui, m_pElemOutSelTemp, GSLC_REDRAW_FOCUS);
     }
 }
 void UpdateBitmapImage(gslc_tsGui* pGui, gslc_tsElemRef* pElemRef, const unsigned short* newBitmap) {
-    if (pElemRef == nullptr) {
-        return; // Element reference is invalid
-    }
-
-    // Clear the element's background
+    if (pElemRef == nullptr) return;
+    gslc_tsElem* pElem = gslc_GetElemFromRef(pGui, pElemRef);
     gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FULL);
-
-    // Update the image reference
     gslc_tsImgRef updImgRef = gslc_GetImageFromProg((const unsigned char*)newBitmap, GSLC_IMGREF_FMT_BMP24);
     gslc_ElemSetImage(pGui, pElemRef, updImgRef, updImgRef);
-
-    // Trigger a redraw of the element to display the new image
     gslc_ElemSetRedraw(pGui, pElemRef, GSLC_REDRAW_FULL);
 }
+
 // Common Button callback
 bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int16_t nY) {
   // Typecast the parameters to match the GUI and element types
@@ -226,21 +186,6 @@ bool CbBtnCommon(void* pvGui,void *pvElemRef,gslc_teTouch eTouch,int16_t nX,int1
   }
   return true;
 }
-//<Checkbox Callback !Start!>
-//<Checkbox Callback !End!>
-//<Keypad Callback !Start!>
-//<Keypad Callback !End!>
-//<Spinner Callback !Start!>
-//<Spinner Callback !End!>
-//<Listbox Callback !Start!>
-//<Listbox Callback !End!>
-//<Draw Callback !Start!>
-//<Draw Callback !End!>
-//<Slider Callback !Start!>
-//<Slider Callback !End!>
-//<Tick Callback !Start!>
-//<Tick Callback !End!>
-
 void setup()
 {
   // ----------------------4--------------------------
@@ -250,9 +195,6 @@ void setup()
   Serial.begin(115200);
   sensors.begin();
   initializeScale();
-  // Wait for USB Serial 
-  //delay(1000);  // NOTE: Some devices require a delay after Serial.begin() before serial port can be used
-
   gslc_InitDebug(&DebugOut);
 
   // ------------------------------------------------
@@ -262,32 +204,20 @@ void setup()
 
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
-
-  // Init ESP-NOW
-  if (esp_now_init() != ESP_OK) {
-    // Serial.println("Error initializing ESP-NOW")
-    return;
-  }
-  // Once ESPNow is successfully Init, we will register for Send CB to
-  // get the status of Trasnmitted packet
+  if (esp_now_init() != ESP_OK) return;
   esp_now_register_send_cb(OnDataSent);
-  // Once ESPNow is successfully Init, we will register for recv CB to
-  // get recv packer info
   esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
-
-   // Register peer
-  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+  memcpy(peerInfo.peer_addr, ESPTMacAddr, 6);
   peerInfo.channel = 0;  
   peerInfo.encrypt = false;
-
-  // Add peer        
-  if (esp_now_add_peer(&peerInfo) != ESP_OK){
-    // Serial.println("Failed to add peer");
-    return;
-  }
+  if (esp_now_add_peer(&peerInfo) != ESP_OK) return;
 
   myData.resetMode = 1;
-  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&myData, sizeof(myData));
+  esp_err_t result = esp_now_send(
+    ESPTMacAddr, 
+    (uint8_t *)&myData, 
+    sizeof(myData)
+  );
   delay(50);
   myData.resetMode = 0;
 }
@@ -310,21 +240,22 @@ Timer timer2(100, []() {
   int y_adc_val; 
   float y_volt;
   y_adc_val = analogRead(joystick_y_pin);
-  y_volt = ( (y_adc_val * 3.3 ) / 4095 );  /*Convert digital value to voltage */
-  myData.isPushed = (y_volt <= 1.3 && y_volt >= 0.6) || y_volt <= 0.4;
+  y_volt = ( (y_adc_val * 3.3 ) / 4095 );
+  myData.isPushed = (y_volt <= 1.3 && 
+                     y_volt >= 0.6) || 
+                     y_volt <= 0.4;
 });
-Timer timer3(5000, []() {
+Timer timer3(1000, []() {
   sensors.requestTemperatures(); 
   myData.CurTemperature = sensors.getTempCByIndex(0);
-  static char TCurTemp[4] = ""; // Ensure TCurTemp is properly declared
+  static char TCurTemp[4] = "";
   snprintf(TCurTemp, sizeof(TCurTemp), "%d", myData.CurTemperature);
   if (m_pElemOutCurTemp != NULL) {
     gslc_ElemSetTxtStr(&m_gui, m_pElemOutCurTemp, TCurTemp);
-  } 
-  // redrawRequired = true;
+  }
 });
 
-Timer timer4(1000, []() {
+Timer timer4(200, []() {
   sendData();
 });
 
@@ -334,36 +265,35 @@ Timer timer4(1000, []() {
 void loop()
 {
   // ------------------------------------------------
-  if (Serial.available() > 0) { // Check if data is available
-    String receivedData = Serial.readStringUntil('\n'); // Read until newline
-    // Parse the data
-    int dummy; // Placeholder for the first value (0)
-    int tempSelTemp_MRange, tempHeaterActivated, tempChildLockActivated, tempResetMode; // Temporary variables for parsing
-    int parsedValues = sscanf(receivedData.c_str(), "%d,%d,%d,%d,%d",
-                               &dummy,
-                               &tempSelTemp_MRange,
-                               &tempHeaterActivated,
-                               &tempChildLockActivated,
-                               &tempResetMode);
+  if (Serial.available() > 0) {
+    String receivedData = Serial.readStringUntil('\n');
+    int dummy;
+    int tempSelTemp_MRange, 
+    tempHeaterActivated, 
+    tempChildLockActivated, 
+    tempResetMode;
+    int parsedValues = sscanf(
+      receivedData.c_str(), 
+      "%d,%d,%d,%d,%d",
+      &dummy,
+      &tempSelTemp_MRange,
+      &tempHeaterActivated,
+      &tempChildLockActivated,
+      &tempResetMode
+    );
     if (parsedValues == 5) {
-      if (dummy == 0) { // Only assign values if dummy is 0
+      if (dummy == 0) {
         myData.SelTemp_MRange = tempSelTemp_MRange;
-
-        if (onStateChange(myData.resetMode, tempResetMode)) {
-          ESP.restart();
-        }
-
+        if (onStateChange(myData.resetMode, tempResetMode)) ESP.restart();
+        UpdateThermometerImage();
         if(onStateChange(myData.heaterActivated, tempHeaterActivated)) {
           m_pElemHeaterState = gslc_PageFindElemById(&m_gui, gslc_GetPageCur(&m_gui), HeaterIndicator);
           gslc_ElemSetGlowEn(&m_gui, m_pElemHeaterState, myData.heaterActivated);
           gslc_ElemSetGlow(&m_gui, m_pElemHeaterState, myData.heaterActivated);
         }
-
-        UpdateThermometerImage();
-
-        if (onStateChange(myData.childLockActivated, tempChildLockActivated)) {
-          sendData();
-        }
+        if (onStateChange(myData.childLockActivated, 
+        tempChildLockActivated)
+        ) sendData();
       }
     }
   }
@@ -375,12 +305,8 @@ void loop()
   // Update GUI Elements
   if (redrawRequired) {
     gslc_ElemSetRedraw(&m_gui, m_pElemOutCurTemp, GSLC_REDRAW_FOCUS);
-    redrawRequired = false; // Reset flag after redraw
+    redrawRequired = false;
   }
-  // ------------------------------------------------
-  
-  //TODO - Add update code for any text, gauges, or sliders
-  
   // ------------------------------------------------
   // Periodically call GUIslice update function
   // ------------------------------------------------
