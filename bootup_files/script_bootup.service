@@ -1,0 +1,18 @@
+[Unit]
+Description=My Python Script Service
+After=network.target
+
+[Service]
+ExecStartPre=/bin/sleep 2
+ExecStart=/usr/bin/python3 /home/adrian/Documents/pr_EPES/Code/Raspberry_Pi/src/classify.py
+# Use the line below if using a virtual environment
+# ExecStart=/home/pi/my_venv/bin/python /home/pi/my_script.py
+WorkingDirectory=/home/adrian/Documents/pr_EPES/Code/Raspberry_Pi/src
+StandardOutput=inherit
+StandardError=inherit
+Restart=Always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
