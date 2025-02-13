@@ -19,6 +19,7 @@ from edge_impulse_linux.image import ImageImpulseRunner
 from button_handler import ButtonHandler
 from timed_executor import TimedExecutor
 from state_handler import StateHandler
+from raspi_util import RaspberryPiManager
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
@@ -113,8 +114,11 @@ IsSpeakerActive = False # Wait flag before TTS tries to execute again.
 error_flag = False
 STATE_FILE = "/home/adrian/Documents/pr_EPES/Code/Raspberry_Pi/src/state.json"
 show_camera = False
+disable_speaker = True
 
 def generate_and_play_audio(text):
+    if disable_speaker:
+        return
     global IsSpeakerActive
     # Please download the binary for Raspberry 4 within Piper's repository.
     # In this case it was already downloaded.
@@ -292,9 +296,9 @@ def buttons_thread():
     hot_button = ButtonHandler(Button5, Buzzer2, Buzzer2, 1.5, short_press_callback=toggle_hot_water, long_press_callback=toggle_childlock)
     temp_lock_button = ButtonHandler(Button7, Buzzer2, Buzzer2, 1.5, long_press_callback=lambda: GPIO.output(LED3, not GPIO.input(LED3)))
 
-    increase_button = ButtonHandler(Button4, Buzzer1, -1, 60, short_press_callback=increase_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW,pull_mode="PULLUP")
-    decrease_button = ButtonHandler(Button3, Buzzer1, -1, 60, short_press_callback=decrease_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW,pull_mode="PULLUP")
-    get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60,pull_mode="PULLUP", short_press_callback=lambda: playTTS(f"Jug Capacity is {ContainerCap} percent"))
+    increase_button = ButtonHandler(Button4, Buzzer1, Buzzer1, 5, short_press_callback=increase_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW,pull_mode="PULLUP",long_press_callback=lambda: RaspberryPiManager().restart())
+    decrease_button = ButtonHandler(Button3, Buzzer1, Buzzer1, 5, short_press_callback=decrease_temp, short_output_condition=lambda: GPIO.input(LED3) == GPIO.LOW,pull_mode="PULLUP",long_press_callback=lambda: RaspberryPiManager().shutdown())
+    get_volume_button = ButtonHandler(Button1, Buzzer1, -1, 60, pull_mode="PULLUP", short_press_callback=lambda: playTTS(f"Jug Capacity is {ContainerCap} percent"))
     get_temperature_button = ButtonHandler(Button2, Buzzer1, Buzzer1, 5, short_press_callback=lambda: playTTS(f"Current temperature is {CurTemperature} degree celcius"), long_press_callback=pressed_reset,pull_mode="PULLUP")
     
     try:
