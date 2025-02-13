@@ -1,11 +1,9 @@
 #!/usr/bin/env python
-
-import device_patches  # Device specific patches for Jetson Nano (needs to be before importing cv2)
 import RPi.GPIO as GPIO
 
 import cv2
 import os
-import sys, getopt
+import sys
 import signal
 import time
 import subprocess
@@ -13,7 +11,6 @@ import threading
 import serial
 import json
 import math
-import concurrent.futures
 from edge_impulse_linux.image import ImageImpulseRunner
 
 from button_handler import ButtonHandler

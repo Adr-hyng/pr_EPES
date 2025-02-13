@@ -1,5 +1,17 @@
+//<File !Start!>
+// FILE: [receiver_espnow_GSLC.h]
+// Created by GUIslice Builder version: [0.17.b34]
+//
+// GUIslice Builder Generated GUI Framework File
+//
+// For the latest guides, updates and support view:
+// https://github.com/ImpulseAdventure/GUIslice
+//
+//<File !End!>
+
 #ifndef _GUISLICE_GEN_H
 #define _GUISLICE_GEN_H
+
 // ------------------------------------------------
 // Headers to include
 // ------------------------------------------------
@@ -12,6 +24,10 @@
 #include "elem/XRingGauge.h"
 //<Includes !End!>
 
+// ------------------------------------------------
+// Headers and Defines for fonts
+// Note that font files are located within the Adafruit-GFX library folder:
+// ------------------------------------------------
 //<Fonts !Start!>
 #if !defined(DRV_DISP_TFT_ESPI)
   #error E_PROJECT_OPTIONS tab->Graphics Library should be Adafruit_GFX
@@ -41,6 +57,7 @@ enum {E_PG_MAIN};
 enum {ContainerCap,CurTemperature,E_ELEM_IMAGE3,E_ELEM_TEXT4
       ,E_ELEM_TEXT5,E_ELEM_TEXT7,E_ELEM_TEXT8,HeaterIndicator
       ,SelTempIMGREF};
+// Must use separate enum for fonts with MAX_FONT at end to use gslc_FontSet.
 enum {E_BUILTIN15X24,E_BUILTIN5X8,E_SEVEN_SEGMENT18,E_SEVEN_SEGMENT30
       ,MAX_FONT};
 //<Enum !End!>
@@ -116,15 +133,27 @@ void InitGUIslice_gen()
   // ------------------------------------------------
   // Load Fonts
   // ------------------------------------------------
+//<Load_Fonts !Start!>
     if (!gslc_FontSet(&m_gui,E_BUILTIN15X24,GSLC_FONTREF_PTR,NULL,3)) { return; }
     if (!gslc_FontSet(&m_gui,E_BUILTIN5X8,GSLC_FONTREF_PTR,NULL,1)) { return; }
     if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT18,GSLC_FONTREF_PTR,&Seven_Segment18pt7b,1)) { return; }
     if (!gslc_FontSet(&m_gui,E_SEVEN_SEGMENT30,GSLC_FONTREF_PTR,&Seven_Segment30pt7b,1)) { return; }
+//<Load_Fonts !End!>
 
 //<InitGUI !Start!>
   gslc_PageAdd(&m_gui,E_PG_MAIN,m_asPage1Elem,MAX_ELEM_PG_MAIN_RAM,m_asPage1ElemRef,MAX_ELEM_PG_MAIN);
+
+  // NOTE: The current page defaults to the first page added. Here we explicitly
+  //       ensure that the main page is the correct page no matter the add order.
   gslc_SetPageCur(&m_gui,E_PG_MAIN);
+  
+  // Set Background to a flat color
   gslc_SetBkgndColor(&m_gui,GSLC_COL_BLACK);
+
+  // -----------------------------------
+  // PAGE: E_PG_MAIN
+  
+
   // Create ring gauge ContainerCap 
   static char m_sRingText1[11] = "";
   pElemRef = gslc_ElemXRingGaugeCreate(&m_gui,ContainerCap,E_PG_MAIN,&m_sXRingGauge1,
@@ -192,5 +221,7 @@ void InitGUIslice_gen()
 //<Startup !Start!>
   gslc_GuiRotate(&m_gui, 0);
 //<Startup !End!>
+
 }
+
 #endif // end _GUISLICE_GEN_H
